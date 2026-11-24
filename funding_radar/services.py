@@ -48,13 +48,16 @@ def create_release(name: str, actor: str, path: Path | None = None) -> str:
     canonical = json.dumps(snapshots, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     content_hash = hashlib.sha256(canonical.encode()).hexdigest()
     release_id = uid()
-    manifest = {"schema_version": 1, "event_ids": [e[0]["event_id"] for e in snapshots], "content_hash": content_hash}
+    manifest = {"schema_version": 2, "event_ids": [e[0]["event_id"] for e in snapshots], "content_hash": content_hash}
     connection = connect(path)
     try:
         with connection:
             connection.execute("INSERT INTO releases VALUES (?,?,?,?,?,?,?,?)", (release_id, name, actor, now(), json.dumps(manifest, sort_keys=True), len(events), content_hash, "published"))
             for position, (event, evidence) in enumerate(snapshots, 1):
                 connection.execute("INSERT INTO release_events VALUES (?,?,?,?,?)", (release_id, event["event_id"], json.dumps(event, ensure_ascii=False, sort_keys=True), json.dumps(evidence, ensure_ascii=False, sort_keys=True), position))
+            audit_id = uid()
+            connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)", (audit_id,actor,"create_release","release",release_id,None,json.dumps({"status":"published"}),"quality gates passed",None,now()))
+            connection.execute("INSERT INTO release_status_history VALUES (?,?,?,?,?,?,?,?)", (uid(),release_id,None,"published",actor,"initial publication",now(),audit_id))
     finally:
         connection.close()
     return release_id

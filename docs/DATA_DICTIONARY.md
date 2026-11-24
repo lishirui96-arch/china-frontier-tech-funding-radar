@@ -1,6 +1,6 @@
 # 融资事件账本 V1 数据字典
 
-Schema version：1。主键均为 UUID/稳定文本 ID；业务名称和 URL 不作为主键。时间使用 ISO 8601 文本，金额使用原币最小单位整数，不使用浮点数。
+Schema version：2。主键均为 UUID/稳定文本 ID；业务名称和 URL 不作为主键。时间使用 ISO 8601 文本，金额使用原币最小单位整数，不使用浮点数。
 
 | 表 | 用途 | 关键字段与约束 |
 |---|---|---|
@@ -22,6 +22,11 @@ Schema version：1。主键均为 UUID/稳定文本 ID；业务名称和 URL 不
 | `release_events` | 不可变发布事件 | 事件和证据 JSON 快照、稳定顺序；触发器禁止更新/删除 |
 | `rule_versions` | 通用规则 | 类型、版本、JSON 定义、启用状态 |
 | `amount_rule_versions` | 金额规则 | 版本、JSON 定义、启用状态 |
+| `import_batches` | URL 导入批次 | 类型、提交/新增/重复/失败、错误、操作者和时间 |
+| `discovery_runs` / `discovery_failures` | 低频发现 | 请求数、结果、解析器、失败、退避和下次允许时间 |
+| `extraction_candidates` | 字段候选 | 原值、标准候选、字符 span、置信度、提取器和审核状态 |
+| `review_rounds` | 双审 | 一审/二审、审核人、结果、发现和理由 |
+| `release_status_history` | 发布状态历史 | 原/新状态、操作者、理由、时间和 audit ID |
 
 ## 审核状态
 

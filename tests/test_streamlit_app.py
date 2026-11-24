@@ -10,6 +10,8 @@ def test_all_internal_pages_render(monkeypatch, tmp_path):
     assert not at.exception
     assert at.title[0].value == "融资事件账本 V1"
     for page in [
+        "app_pages/00_url_import.py",
+        "app_pages/00_source_management.py",
         "app_pages/01_candidate_documents.py",
         "app_pages/02_entity_review.py",
         "app_pages/03_dedup_review.py",

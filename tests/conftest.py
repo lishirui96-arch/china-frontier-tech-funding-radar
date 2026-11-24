@@ -17,8 +17,8 @@ def db(tmp_path: Path) -> Path:
     connection = connect(path)
     t = now()
     with connection:
-        connection.execute("INSERT INTO sources VALUES (?,?,?,?,?,?,?,?)", ("src-a", "Fixture official", "company_official", "official", "A", "https://example.invalid", "test-only", t))
-        connection.execute("INSERT INTO sources VALUES (?,?,?,?,?,?,?,?)", ("src-d", "Fixture lead", "aggregator", "aggregator", "D", "https://example.invalid", "test-only", t))
+        connection.execute("INSERT INTO sources(source_id,name,source_type,source_family,evidence_default_grade,base_url,terms_status,created_at) VALUES (?,?,?,?,?,?,?,?)", ("src-a", "Fixture official", "company_official", "official", "A", "https://example.invalid", "test-only", t))
+        connection.execute("INSERT INTO sources(source_id,name,source_type,source_family,evidence_default_grade,base_url,terms_status,created_at) VALUES (?,?,?,?,?,?,?,?)", ("src-d", "Fixture lead", "aggregator", "aggregator", "D", "https://example.invalid", "test-only", t))
         connection.execute("INSERT INTO amount_rule_versions VALUES (?,?,?,?,?)", ("amount-v1", "1.0.0", json.dumps({"test": True}), 1, t))
         connection.execute("INSERT INTO rule_versions VALUES (?,?,?,?,?,?)", ("dedup-v1", "dedup", "1.0.0", json.dumps({"test": True}), 1, t))
     connection.close()
@@ -27,7 +27,8 @@ def db(tmp_path: Path) -> Path:
 
 def add_document(connection, doc_id="doc-1", grade="A", text="公司宣布完成融资"):
     source = "src-a" if grade != "D" else "src-d"
-    connection.execute("INSERT INTO raw_documents VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (doc_id, source, f"https://example.invalid/{doc_id}", f"https://example.invalid/{doc_id}", "固定脱敏测试文档", "2025-01-01", now(), text, doc_id*4, "fixture", None, "summary_saved", "fixture-v1", "relevant", "field_review", now()))
+    connection.execute("""INSERT INTO raw_documents(document_id,source_id,original_url,canonical_url,title,published_at,fetched_at,text_or_summary,content_hash,source_family,discovered_via_document_id,archive_status,parser_version,relevance_status,review_status,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (doc_id, source, f"https://example.invalid/{doc_id}", f"https://example.invalid/{doc_id}", "固定脱敏测试文档", "2025-01-01", now(), text, doc_id*4, "fixture", None, "summary_saved", "fixture-v1", "relevant", "field_review", now()))
 
 
 def add_company(connection, company_id="company-1", name="测试科技甲", status="confirmed"):

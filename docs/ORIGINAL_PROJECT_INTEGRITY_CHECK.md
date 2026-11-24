@@ -19,3 +19,5 @@
 | `work/citation-ui-test.db` | 548618240 | `2026-11-23T08:02:21.4447311Z` |
 
 新项目的数据库保护还会拒绝路径中包含 `university-research-radar` 或文件名为 `radar.db` 的连接，包括只读/写入入口，防止误配置。
+
+阶段 1.1 完成后再次复核：Git 仍为 `main...origin/main`、工作区无改动、commit 仍为 `c5381f3c0c4b7d7373d2335bb3d07fc8f6b3e619`；四个关键源码 SHA-256 与上表一致。原数据库未被新项目连接或迁移。

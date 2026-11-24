@@ -12,7 +12,7 @@ def _date_score(a: str | None, b: str | None) -> float:
     return 1.0 if days <= 7 else 0.7 if days <= 30 else 0.3 if days <= 45 else 0.0
 
 
-def compare_events(left: dict, right: dict) -> dict:
+def compare_events(left: dict, right: dict, left_investors: set[str] | None = None, right_investors: set[str] | None = None, citation_link: bool = False) -> dict:
     same_company = left["company_id"] == right["company_id"]
     company_score = 1.0 if same_company else 0.0
     round_score = 0.4 if not left.get("round_normalized") or not right.get("round_normalized") else float(left["round_normalized"] == right["round_normalized"])
@@ -30,7 +30,11 @@ def compare_events(left: dict, right: dict) -> dict:
         conflicts.append("different_company")
     if round_score == 0 and left.get("round_normalized") and right.get("round_normalized"):
         conflicts.append("different_explicit_round")
-    total = 0.35*company_score + 0.2*date_score + 0.15*round_score + 0.15*amount_score + 0.15*text_score
+    left_investors, right_investors = left_investors or set(), right_investors or set()
+    union = left_investors | right_investors
+    investor_score = len(left_investors & right_investors) / len(union) if union else 0.0
+    citation_score = 1.0 if citation_link else 0.0
+    total = 0.30*company_score + 0.15*date_score + 0.15*round_score + 0.15*amount_score + 0.10*investor_score + 0.10*text_score + 0.05*citation_score
     risk = "high" if same_company and total >= 0.75 and not conflicts else "medium" if same_company and total >= 0.5 else "low"
-    return {"company_score": company_score, "date_score": date_score, "round_score": round_score, "amount_score": amount_score, "investor_score": 0.0, "text_score": text_score, "citation_score": 0.0, "strong_conflicts_json": json.dumps(conflicts), "feature_details_json": json.dumps({"same_company": same_company}, sort_keys=True), "total_score": total, "risk_level": risk}
+    return {"company_score": company_score, "date_score": date_score, "round_score": round_score, "amount_score": amount_score, "investor_score": investor_score, "text_score": text_score, "citation_score": citation_score, "strong_conflicts_json": json.dumps(conflicts), "feature_details_json": json.dumps({"same_company": same_company, "shared_investors": sorted(left_investors & right_investors), "citation_link": citation_link}, sort_keys=True), "total_score": total, "risk_level": risk}
 
