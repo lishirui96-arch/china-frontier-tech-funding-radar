@@ -47,6 +47,9 @@ def test_public_routes_and_empty_states(monkeypatch, db):
     assert client.get("/favicon.ico").status_code == 204
     home = client.get("/").text
     assert "暂无已发布数据" in home
+    assert "每月融资事件数" in home and "最活跃投资方" in home and "融资事件明细" in home
+    assert "暂无已发布融资数据" in home and "暂无已发布投资机构数据" in home
+    assert "90天" not in home and "360天" not in home and "period=" not in home
     assert "0亿元" not in home and "0家企业" not in home
 
 

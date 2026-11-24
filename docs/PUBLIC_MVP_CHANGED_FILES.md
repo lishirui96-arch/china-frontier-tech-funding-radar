@@ -8,8 +8,10 @@
 - `public_site/static/site.css`：响应式视觉样式。
 - `scripts/run_public_site.py`：8511 独立启动脚本。
 - `tests/test_public_site.py`：公开端隔离、快照、撤回、路由和空状态测试。
+- `tests/test_monthly_public_analysis.py`：自然月统计、去重、时区、筛选联动和 Release 隔离测试。
 - `docs/screenshots/*`：浏览器验收截图及 JSON 结果。
 - `docs/PUBLIC_*.md`：本轮实施、路由、架构、验收及修改清单。
+- `docs/MONTHLY_ANALYSIS_IMPLEMENTATION.md`：首页月度分析改版说明。
 
 ## 修改
 

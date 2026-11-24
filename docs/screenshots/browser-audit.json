@@ -32,9 +32,19 @@
     "failedResources": []
   },
   {
-    "name": "period-360",
-    "url": "http://127.0.0.1:8511/?period=360",
-    "text": "近 360 天"
+    "name": "monthly-home",
+    "hasMonthly": true,
+    "hasInvestors": true,
+    "hasEventTable": true,
+    "hasRollingPeriods": false,
+    "emptyStates": 3
+  },
+  {
+    "name": "linked-filter-empty",
+    "url": "http://127.0.0.1:8511/?track=&year=&round=&company=%E4%B8%8D%E5%AD%98%E5%9C%A8%E7%9A%84%E4%BC%81%E4%B8%9A&investor=",
+    "monthlyEmpty": true,
+    "investorEmpty": true,
+    "eventEmpty": true
   },
   {
     "name": "search",
