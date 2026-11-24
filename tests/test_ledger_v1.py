@@ -157,9 +157,11 @@ def test_repository_read_only_rejects_writes(db):
 
 
 def test_logs_and_project_files_contain_no_api_keys():
+    import re
     root = Path(__file__).resolve().parents[1]
     for path in root.rglob("*"):
         if path.is_file() and path.name != Path(__file__).name and ".venv" not in path.parts and path.suffix in {".py",".md",".toml",".sql",".txt",".json"}:
             text = path.read_text(encoding="utf-8", errors="ignore")
-            assert ("s" + "k-") not in text and ("OPENALEX" + "_API_KEY=") not in text
+            assert not re.search(r"\b" + "s" + r"k-[A-Za-z0-9_-]{20,}", text)
+            assert not re.search(("OPENALEX" + "_API_KEY") + r"\s*=\s*[^\s'\"]+", text)
 

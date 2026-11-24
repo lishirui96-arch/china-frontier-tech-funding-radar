@@ -43,6 +43,13 @@ def create_release(name: str, actor: str, path: Path | None = None) -> str:
     events = repo.rows("SELECT e.*, c.official_name AS company_name FROM funding_events e JOIN companies c USING(company_id) WHERE e.review_status='approved' ORDER BY e.event_id")
     snapshots = []
     for event in events:
+        investors = repo.rows(
+            """SELECT i.investor_id,i.official_name,ei.role,ei.role_original
+               FROM event_investors ei JOIN investors i USING(investor_id)
+               WHERE ei.event_id=? ORDER BY i.official_name""",
+            (event["event_id"],),
+        )
+        event["investors"] = investors
         evidence = repo.evidence_for_event(event["event_id"])
         snapshots.append((event, evidence))
     canonical = json.dumps(snapshots, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

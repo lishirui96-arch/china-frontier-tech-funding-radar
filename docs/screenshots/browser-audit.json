@@ -1,0 +1,69 @@
+[
+  {
+    "name": "home-desktop",
+    "status": 200,
+    "title": "首页 · 中国前沿科技融资热点雷达",
+    "overflow": false,
+    "errors": [],
+    "failedResources": []
+  },
+  {
+    "name": "home-mobile",
+    "status": 200,
+    "title": "首页 · 中国前沿科技融资热点雷达",
+    "overflow": false,
+    "errors": [],
+    "failedResources": []
+  },
+  {
+    "name": "fields-desktop",
+    "status": 200,
+    "title": "六大学科 · 中国前沿科技融资热点雷达",
+    "overflow": false,
+    "errors": [],
+    "failedResources": []
+  },
+  {
+    "name": "methodology-desktop",
+    "status": 200,
+    "title": "数据说明 · 中国前沿科技融资热点雷达",
+    "overflow": false,
+    "errors": [],
+    "failedResources": []
+  },
+  {
+    "name": "period-360",
+    "url": "http://127.0.0.1:8511/?period=360",
+    "text": "近 360 天"
+  },
+  {
+    "name": "search",
+    "status": true,
+    "empty": true
+  },
+  {
+    "name": "/tracks/example",
+    "status": 200,
+    "empty": true
+  },
+  {
+    "name": "/emerging",
+    "status": 200,
+    "empty": true
+  },
+  {
+    "name": "/companies/example",
+    "status": 200,
+    "empty": true
+  },
+  {
+    "name": "/investors/example",
+    "status": 200,
+    "empty": true
+  },
+  {
+    "name": "/events/example",
+    "status": 200,
+    "empty": true
+  }
+]
