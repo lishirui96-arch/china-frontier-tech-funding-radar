@@ -50,6 +50,9 @@ page = st.navigation({
         st.Page("app_pages/11_multiplatform_audit.py", title="多平台交叉核验", icon=":material/compare_arrows:", help="查看SpaceDaily、36氪、投中、财联社等平台候选及交叉去重结果。"),
         st.Page("app_pages/12_quality_audit.py", title="候选质量审计", icon=":material/fact_check:", help="查看V1.3企业实体、字段级核验、重复冲突及并购核验结果。"),
         st.Page("app_pages/13_event_review_queue.py", title="融资事件审核队列", icon=":material/playlist_add_check:", help="裁决轮次冲突、重复关系与样本统计资格，所有人工操作写入审计日志。"),
+        st.Page("app_pages/14_formal_funding_review.py", title="11月正式融资审核", icon=":material/how_to_reg:", help="分批人工确认A类候选，专项处理B类问题；默认不执行任何决定。"),
+        st.Page("app_pages/15_acquisition_review.py", title="并购人工审核", icon=":material/account_balance:", help="人工确认并购交易阶段，严格区分拟收购、审议、审批和交割。"),
+        st.Page("app_pages/16_confirmed_statistics.py", title="正式样本统计与技术分析", icon=":material/analytics:", help="仅统计人工确认纳入的正式月度样本，并准备企业技术画像。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),

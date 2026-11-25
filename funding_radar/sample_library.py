@@ -156,6 +156,96 @@ class SampleLibraryService:
                 connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor,"v14_"+action,"v14_event_unit",event_unit_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,now()))
         finally: connection.close()
 
+    def v15_funding_queue(self, queue_class: str, batch: int = 0, issue_group: str = "") -> list[dict[str, Any]]:
+        clauses=["q.queue_class=?"]; params: list[Any]=[queue_class]
+        if batch: clauses.append("q.batch_number=?"); params.append(batch)
+        if issue_group: clauses.append("q.issue_group=?"); params.append(issue_group)
+        return self.repo.rows(f"""SELECT q.*,u.company_id,u.disclosure_date,u.amount_original,
+            a.original_company_name,a.source_title,a.source_url,a.evidence_grade,a.quality_issues_json,
+            e.primary_business,e.core_products,e.primary_category,e.secondary_track,
+            GROUP_CONCAT(DISTINCT fv.field_name||':'||fv.verification_status) AS field_verifications,
+            GROUP_CONCAT(DISTINCT CASE WHEN a2.audit_id<>a.audit_id THEN a2.source_url END) AS cross_sources
+          FROM v15_funding_review_queue q JOIN v14_event_units u USING(event_unit_id)
+          JOIN v13_candidate_quality_audits a USING(audit_id) JOIN v13_company_entities e USING(company_id)
+          LEFT JOIN v13_field_verifications fv USING(audit_id)
+          LEFT JOIN v13_candidate_relations rel ON rel.left_audit_id=a.audit_id OR rel.right_audit_id=a.audit_id
+          LEFT JOIN v13_candidate_quality_audits a2 ON a2.audit_id=CASE WHEN rel.left_audit_id=a.audit_id THEN rel.right_audit_id ELSE rel.left_audit_id END
+          WHERE {' AND '.join(clauses)} GROUP BY q.review_item_id ORDER BY q.batch_number,u.disclosure_date DESC,e.short_name""",tuple(params))
+
+    def review_v15_funding(self, review_item_id: str, *, decision: str, actor: str, reason: str,
+                           company_name: str, round_name: str, primary_category: str,
+                           secondary_track: str, investors: str, notes: str) -> None:
+        if decision not in {"confirm","hold","exclude","edit"}: raise ValueError("Unsupported review decision")
+        if not actor.strip() or not reason.strip(): raise ValueError("审核人和审核依据不能为空")
+        if decision=="confirm" and (not company_name.strip() or not round_name.strip()): raise ValueError("确认纳入前必须确认企业名称和融资轮次")
+        connection=connect(self.path)
+        try:
+            with connection:
+                row=connection.execute("""SELECT q.*,u.company_id,u.disclosure_date,u.amount_original
+                  FROM v15_funding_review_queue q JOIN v14_event_units u USING(event_unit_id)
+                  WHERE q.review_item_id=?""",(review_item_id,)).fetchone()
+                if not row: raise ValueError("Unknown review item")
+                before=dict(row); status={"confirm":"confirmed","hold":"held","exclude":"excluded","edit":row["review_status"]}[decision]; timestamp=now()
+                connection.execute("""UPDATE v15_funding_review_queue SET suggested_company_name=?,suggested_round=?,
+                  suggested_primary_category=?,suggested_secondary_track=?,suggested_investors=?,suggested_notes=?,
+                  review_status=?,last_reviewed_at=?,last_reviewed_by=?,updated_at=? WHERE review_item_id=?""",
+                  (company_name.strip(),round_name.strip(),primary_category.strip(),secondary_track.strip(),investors.strip(),notes.strip(),status,timestamp,actor.strip(),timestamp,review_item_id))
+                after=dict(connection.execute("SELECT * FROM v15_funding_review_queue WHERE review_item_id=?",(review_item_id,)).fetchone())
+                connection.execute("INSERT INTO v15_funding_review_actions VALUES (?,?,?,?,?,?,?,?)",(uid(),review_item_id,decision,actor,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,timestamp))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor,"v15_funding_"+decision,"v15_funding_review",review_item_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
+                if decision=="confirm":
+                    confirmed_id="v15-"+review_item_id
+                    connection.execute("""INSERT OR REPLACE INTO v15_confirmed_funding_events
+                      VALUES (?,?,?,?,?,?,?,?,NULL,NULL,?,?,?,?,?,?,1)""",(confirmed_id,review_item_id,row["company_id"],company_name.strip(),row["disclosure_date"],before["suggested_round"],round_name.strip(),row["amount_original"],investors.strip(),primary_category.strip(),secondary_track.strip(),notes.strip(),actor.strip(),timestamp))
+                    entity=connection.execute("SELECT * FROM v13_company_entities WHERE company_id=?",(row["company_id"],)).fetchone()
+                    connection.execute("""INSERT OR REPLACE INTO v15_technology_analysis VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                      ("tech-"+confirmed_id,confirmed_id,row["company_id"],company_name.strip(),entity["primary_business"],entity["core_products"],"待人工补充","待人工补充","待人工补充","待人工补充",primary_category.strip(),secondary_track.strip(),entity["evidence_urls_json"],secondary_track.strip(),"pending",timestamp,timestamp))
+                elif decision in {"hold","exclude"}:
+                    connection.execute("UPDATE v15_confirmed_funding_events SET is_active=0 WHERE review_item_id=?",(review_item_id,))
+        finally: connection.close()
+
+    def v15_review_summary(self) -> dict[str, Any]:
+        result={r["review_status"]:r["n"] for r in self.repo.rows("SELECT review_status,COUNT(*) n FROM v15_funding_review_queue GROUP BY review_status")}
+        result["confirmed_events"]=self.repo.rows("SELECT COUNT(*) n FROM v15_confirmed_funding_events WHERE is_active=1")[0]["n"]
+        return result
+
+    def v15_confirmed_statistics(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT round_confirmed,primary_category,secondary_track,amount_currency,
+          COUNT(*) event_count,COUNT(DISTINCT company_id) company_count,
+          SUM(CASE WHEN amount_cny IS NOT NULL THEN amount_cny END) disclosed_amount_cny,
+          SUM(CASE WHEN amount_original IN ('未披露','') THEN 1 ELSE 0 END) undisclosed_amount_count
+          FROM v15_confirmed_funding_events WHERE is_active=1
+          GROUP BY round_confirmed,primary_category,secondary_track,amount_currency ORDER BY event_count DESC""")
+
+    def v15_acquisition_queue(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT q.*,v.* FROM v15_acquisition_review_queue q
+          JOIN v13_acquisition_verifications v USING(acquisition_key) ORDER BY v.first_announcement_date DESC""")
+
+    def review_v15_acquisition(self, review_item_id: str, *, decision: str, transaction_status: str, actor: str, reason: str, notes: str) -> None:
+        if decision not in {"confirm_status","hold","exclude","edit"}: raise ValueError("Unsupported acquisition decision")
+        if not actor.strip() or not reason.strip(): raise ValueError("审核人和审核依据不能为空")
+        connection=connect(self.path)
+        try:
+            with connection:
+                row=connection.execute("SELECT * FROM v15_acquisition_review_queue WHERE review_item_id=?",(review_item_id,)).fetchone()
+                if not row: raise ValueError("Unknown acquisition review item")
+                before=dict(row); status={"confirm_status":"confirmed","hold":"held","exclude":"excluded","edit":row["review_status"]}[decision]; timestamp=now()
+                connection.execute("""UPDATE v15_acquisition_review_queue SET confirmed_transaction_status=?,review_status=?,human_notes=?,
+                  last_reviewed_at=?,last_reviewed_by=?,updated_at=? WHERE review_item_id=?""",(transaction_status,status,notes,timestamp,actor,timestamp,review_item_id))
+                after=dict(connection.execute("SELECT * FROM v15_acquisition_review_queue WHERE review_item_id=?",(review_item_id,)).fetchone())
+                connection.execute("INSERT INTO v15_acquisition_review_actions VALUES (?,?,?,?,?,?,?,?)",(uid(),review_item_id,decision,actor,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,timestamp))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor,"v15_acquisition_"+decision,"v15_acquisition_review",review_item_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
+        finally: connection.close()
+
+    def v15_technology_analysis(self) -> list[dict[str, Any]]:
+        return self.repo.rows("SELECT * FROM v15_technology_analysis ORDER BY primary_category,secondary_track,company_name")
+
+    def v15_actions(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT 'funding' action_scope,action_id,review_item_id,decision,actor,reason,occurred_at
+          FROM v15_funding_review_actions UNION ALL
+          SELECT 'acquisition',action_id,review_item_id,decision,actor,reason,occurred_at
+          FROM v15_acquisition_review_actions ORDER BY occurred_at DESC""")
+
     def funding_events(self, *, category_id: str = "", round_name: str = "", query: str = "") -> list[dict[str, Any]]:
         clauses = ["p.sample_month='2026-11'", "p.inclusion_status='included'"]
         params: list[Any] = []

@@ -31,6 +31,6 @@ else:
     display = pd.DataFrame([{ "日期":r["announcement_date"],"企业":r["company_name"],"赛道":r["secondary_track"],"轮次":r["round_original"],"金额":r["amount_original"],"投资方":r["investors"] or "未披露","来源":r["source_url"]} for r in rows])
     st.dataframe(display, hide_index=True, width="stretch", alt="2026年11月早期融资事件明细", column_config={"来源": st.column_config.LinkColumn("来源")})
 
-workbook = Path(__file__).resolve().parents[2] / "docs" / "NOVEMBER_2026_FUNDING_RADAR_QUALITY_AUDIT_V1_3.xlsx"
+workbook = Path(__file__).resolve().parents[2] / "docs" / "NOVEMBER_2026_FUNDING_RADAR_HUMAN_REVIEW_V1_5.xlsx"
 if workbook.exists():
     st.download_button("下载完整Excel", workbook.read_bytes(), file_name=workbook.name, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", icon=":material/download:")
