@@ -5,8 +5,8 @@ from funding_radar.sample_library import SampleLibraryService
 
 
 service = SampleLibraryService()
-st.title("V1.1 来源覆盖审计")
-st.caption("检索窗口：2026-11-01 至 2026-11-25。新增候选需经人工审核后才能进入正式事件和公开站。")
+st.title("V1.1 历史来源审计")
+st.caption("历史记录保留。V1.5.1当前融资来源口径仅包括投资界和SpaceDaily，本页不再用于项目进度评价。")
 
 summary = service.v11_summary()
 cols = st.columns(4)

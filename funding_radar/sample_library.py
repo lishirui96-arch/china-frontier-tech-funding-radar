@@ -246,6 +246,31 @@ class SampleLibraryService:
           SELECT 'acquisition',action_id,review_item_id,decision,actor,reason,occurred_at
           FROM v15_acquisition_review_actions ORDER BY occurred_at DESC""")
 
+    def v151_progress(self) -> dict[str, Any]:
+        result={}
+        result["pedaily_candidates"]=self.repo.rows("SELECT COUNT(*) n FROM v151_source_scope_checks WHERE source_scope_status='in_scope_pedaily'")[0]["n"]
+        result["spacedaily_candidates"]=self.repo.rows("SELECT COUNT(*) n FROM v151_source_scope_checks WHERE source_scope_status='in_scope_spacedaily'")[0]["n"]
+        result["out_of_scope_sources"]=self.repo.rows("SELECT COUNT(*) n FROM v151_source_scope_checks WHERE source_scope_status='out_of_scope_pending'")[0]["n"]
+        result["date_in_scope"]=self.repo.rows("SELECT COUNT(*) n FROM v151_source_scope_checks WHERE date_scope_status='in_scope'")[0]["n"]
+        result["name_checked"]=self.repo.rows("SELECT COUNT(*) n FROM v13_candidate_quality_audits WHERE name_quality_status IN ('accurate','corrected')")[0]["n"]
+        result.update(self.v15_review_summary())
+        result["a_total"]=self.repo.rows("SELECT COUNT(*) n FROM v15_funding_review_queue WHERE queue_class='A'")[0]["n"]
+        result["a_reviewed"]=self.repo.rows("SELECT COUNT(*) n FROM v15_funding_review_queue WHERE queue_class='A' AND review_status<>'pending'")[0]["n"]
+        result["b_total"]=self.repo.rows("SELECT COUNT(*) n FROM v15_funding_review_queue WHERE queue_class='B'")[0]["n"]
+        result["b_resolved"]=self.repo.rows("SELECT COUNT(*) n FROM v15_funding_review_queue WHERE queue_class='B' AND review_status<>'pending'")[0]["n"]
+        result["acquisitions"]=self.repo.rows("SELECT COUNT(*) n FROM v15_acquisition_review_queue")[0]["n"]
+        result["technology_classified"]=self.repo.rows("SELECT COUNT(*) n FROM v15_technology_analysis")[0]["n"]
+        return result
+
+    def v151_source_scope(self, batch1_only: bool = False) -> list[dict[str, Any]]:
+        extra="AND q.queue_class='A' AND q.batch_number=1" if batch1_only else ""
+        return self.repo.rows(f"""SELECT s.*,q.queue_class,q.batch_number,q.suggested_company_name,
+          q.review_status FROM v151_source_scope_checks s JOIN v15_funding_review_queue q USING(review_item_id)
+          WHERE 1=1 {extra} ORDER BY q.batch_number,s.disclosure_date DESC,q.suggested_company_name""")
+
+    def v151_batch1_recommendations(self) -> list[dict[str, Any]]:
+        return self.repo.rows("SELECT * FROM v151_batch1_recommendations ORDER BY source_page_date DESC,company_name")
+
     def funding_events(self, *, category_id: str = "", round_name: str = "", query: str = "") -> list[dict[str, Any]]:
         clauses = ["p.sample_month='2026-11'", "p.inclusion_status='included'"]
         params: list[Any] = []

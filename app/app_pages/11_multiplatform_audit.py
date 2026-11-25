@@ -5,8 +5,8 @@ from funding_radar.sample_library import SampleLibraryService
 
 
 service=SampleLibraryService()
-st.title("V1.2 多平台交叉核验")
-st.caption("新增数据全部处于候选层；未经过人工双审，不进入正式事件和公开站。")
+st.title("V1.2 历史多平台交叉核验")
+st.caption("本页仅保留历史采集结果。V1.5.1不再考核多平台独立发现或交叉覆盖率。")
 summary=service.v12_summary()
 cols=st.columns(4)
 cols[0].metric("候选观察",summary["candidate_observations"])
