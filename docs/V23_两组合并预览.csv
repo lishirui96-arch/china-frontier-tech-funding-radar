@@ -1,0 +1,3 @@
+﻿preview_id,left_topic_id,left_name,right_topic_id,right_name,proposed_name,merged_company_count,merged_event_count,difference_json,review_status
+b83d1e7d-13b3-5f7a-bc58-52e00ac10afb,23e32666-f6e1-5226-afed-00e27ccce496,卫星载荷与定量遥感数据链,b39f7a86-6ce5-5deb-8e73-db4dfc34f5ae,卫星载荷与遥感数据服务,卫星载荷与遥感数据系统,2,3,"{""shared_companies"": 2, ""shared_events"": 3, ""left_only_companies"": [], ""right_only_companies"": []}",pending
+86bff3b2-e86d-5382-9de8-150e7685cfd6,9c9c85ab-2abf-5df2-984f-6bfb0a6a4d05,固态电池关键材料,80c0b2e6-8730-5b1f-bc63-efabc0080c79,固态电池电解质材料,固态电池电解质与关键材料,1,2,"{""shared_companies"": 1, ""shared_events"": 1, ""left_only_companies"": [], ""right_only_companies"": []}",pending

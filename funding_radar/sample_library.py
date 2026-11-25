@@ -471,6 +471,52 @@ class SampleLibraryService:
                 connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor.strip(),"v22_"+action,"v22_topic",topic_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
         finally: connection.close()
 
+    def v23_review_cards(self, candidate_class: str = "") -> list[dict[str, Any]]:
+        where="WHERE c.candidate_class=?" if candidate_class else "";params=(candidate_class,) if candidate_class else ()
+        return self.repo.rows(f"""SELECT c.*,t.candidate_name,t.technical_boundary,t.management_status,t.review_status,
+          i.name industry_name,f.name field_name,COUNT(DISTINCT l.company_id) company_count,COUNT(DISTINCT et.event_id) event_count,
+          COUNT(DISTINCT CASE WHEN e.data_status='formal' THEN e.event_id END) formal_count,
+          COUNT(DISTINCT CASE WHEN e.data_status='A_candidate' THEN e.event_id END) a_count,
+          COUNT(DISTINCT CASE WHEN e.data_status='B_candidate' THEN e.event_id END) b_count
+          FROM v23_review_cards c JOIN v22_topics t ON t.topic_id=c.source_topic_id JOIN v22_fields f USING(field_id)
+          JOIN v22_industries i USING(industry_id) LEFT JOIN v22_company_topic_links l ON l.topic_id=t.topic_id
+          LEFT JOIN v22_event_topics et ON et.topic_id=t.topic_id LEFT JOIN v22_events e USING(event_id)
+          {where} GROUP BY c.card_id ORDER BY i.sort_order,f.sort_order,t.candidate_name""",params)
+
+    def v23_merge_previews(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT p.*,l.candidate_name left_name,r.candidate_name right_name
+          FROM v23_merge_previews p JOIN v22_topics l ON l.topic_id=p.left_topic_id
+          JOIN v22_topics r ON r.topic_id=p.right_topic_id ORDER BY p.proposed_name""")
+
+    def v23_formal_directory(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT t.*,i.name industry_name,f.name field_name,GROUP_CONCAT(s.source_topic_id) source_topic_ids
+          FROM v23_formal_topics t JOIN v22_fields f USING(field_id) JOIN v22_industries i USING(industry_id)
+          LEFT JOIN v23_formal_topic_sources s USING(formal_topic_id) WHERE t.is_active=1 GROUP BY t.formal_topic_id
+          ORDER BY i.sort_order,f.sort_order,t.formal_name""")
+
+    def adjudicate_v23_topic(self, source_topic_id: str, *, decision: str, actor: str, reason: str,
+                             formal_name: str = "", field_id: str = "") -> None:
+        allowed={"confirm_formal","confirm_observation","hold","exclude","rename_and_confirm","change_field_and_confirm"}
+        if decision not in allowed: raise ValueError("不支持的V2.3裁决")
+        if not actor.strip() or not reason.strip(): raise ValueError("审核人和审核依据不能为空")
+        connection=connect(self.path);timestamp=now()
+        try:
+            with connection:
+                topic=connection.execute("SELECT * FROM v22_topics WHERE topic_id=?",(source_topic_id,)).fetchone()
+                if not topic: raise ValueError("未知来源主题")
+                before=dict(topic);result_id=None;after={"decision":decision}
+                if decision in {"confirm_formal","confirm_observation","rename_and_confirm","change_field_and_confirm"}:
+                    name=formal_name.strip() or topic["candidate_name"]
+                    target_field=field_id or topic["field_id"]
+                    if decision=="rename_and_confirm" and not formal_name.strip(): raise ValueError("请填写确认后的主题名称")
+                    if not connection.execute("SELECT 1 FROM v22_fields WHERE field_id=?",(target_field,)).fetchone(): raise ValueError("目标技术领域无效")
+                    topic_class="A_formal_multi" if decision!="confirm_observation" else "B_observation"
+                    result_id="v23-"+uid();connection.execute("INSERT INTO v23_formal_topics VALUES (?,?,?,?,?,?,?,?,?)",(result_id,target_field,name,topic_class,topic["technical_boundary"],"confirmed",actor.strip(),timestamp,1))
+                    connection.execute("INSERT INTO v23_formal_topic_sources VALUES (?,?,?)",(result_id,source_topic_id,"confirmed_source"));after=dict(connection.execute("SELECT * FROM v23_formal_topics WHERE formal_topic_id=?",(result_id,)).fetchone())
+                connection.execute("INSERT INTO v23_adjudications VALUES (?,?,?,?,?,?,?,?,?)",(uid(),source_topic_id,result_id,decision,actor.strip(),json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,timestamp))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor.strip(),"v23_"+decision,"v23_topic_adjudication",source_topic_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
+        finally: connection.close()
+
     def v151_source_scope(self, batch1_only: bool = False) -> list[dict[str, Any]]:
         extra="AND q.queue_class='A' AND q.batch_number=1" if batch1_only else ""
         return self.repo.rows(f"""SELECT s.*,q.queue_class,q.batch_number,q.suggested_company_name,
