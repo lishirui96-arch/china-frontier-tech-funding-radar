@@ -39,9 +39,15 @@ def home_page():
         FROM sources s LEFT JOIN discovery_runs r USING(source_id) GROUP BY s.source_id ORDER BY s.name"""), width="stretch", hide_index=True, alt="各来源发现成功率")
     st.info("请依次完成文档、实体、去重、事件和发布审核。")
 
-page = st.navigation(
-    [
-        st.Page(home_page, title="账本概览", icon=":material/receipt_long:", default=True),
+page = st.navigation({
+    "": [st.Page(home_page, title="账本概览", icon=":material/receipt_long:", default=True)],
+    "11月样本库": [
+        st.Page("app_pages/06_november_samples.py", title="融资与并购明细", icon=":material/table_view:", help="查看2026年11月增量样本，按产业、赛道、轮次和企业筛选，并下载完整Excel。"),
+        st.Page("app_pages/07_technology_keywords.py", title="技术关键词库", icon=":material/key:", help="查看企业、事件、证据来源与标准化技术关键词的对应关系。"),
+        st.Page("app_pages/08_candidate_themes.py", title="候选主题库", icon=":material/hub:", help="查看人工审核前的技术关联分组、边界、企业、事件和关键词。"),
+        st.Page("app_pages/09_theme_review.py", title="候选主题人工审核", icon=":material/rule:", help="执行候选主题改名、合并、拆分、成员移动和状态决定，所有操作保留审计记录。"),
+    ],
+    "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),
         st.Page("app_pages/00_source_management.py", title="来源管理", icon=":material/source:"),
         st.Page("app_pages/01_candidate_documents.py", title="候选文档", icon=":material/article:"),
@@ -50,7 +56,6 @@ page = st.navigation(
         st.Page("app_pages/04_event_review.py", title="事件审核", icon=":material/fact_check:"),
         st.Page("app_pages/05_release_review.py", title="发布审核", icon=":material/publish:"),
     ],
-    position="top",
-)
+}, position="sidebar")
 page.run()
 

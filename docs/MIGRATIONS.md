@@ -2,6 +2,8 @@
 
 `migrations/001_initial.sql` 建立 V1 的 18 张业务/审计表、索引和不可变触发器。`funding_radar.migrations.migrate()` 按三位数字文件名前缀顺序执行：
 
+`migrations/003_november_sample_library.sql` 新增月度融资样本画像、独立并购事件、企业技术画像、六大产业分类、技术关键词、候选主题及人工调整历史。迁移只增加表和索引，不删除或覆盖已有数据。
+
 1. 先创建迁移登记表；
 2. 读取已应用版本和校验和；
 3. 未应用迁移在事务中执行；

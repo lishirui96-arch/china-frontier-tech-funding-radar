@@ -1,4 +1,4 @@
 """Funding event ledger V1."""
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
