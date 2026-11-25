@@ -105,6 +105,57 @@ class SampleLibraryService:
     def v13_acquisition_verifications(self) -> list[dict[str, Any]]:
         return self.repo.rows("SELECT * FROM v13_acquisition_verifications ORDER BY first_announcement_date DESC,buyer_name")
 
+    def v14_review_queue(self, eligibility: str = "") -> list[dict[str, Any]]:
+        where = "WHERE u.sample_eligibility_status=?" if eligibility else ""
+        params = (eligibility,) if eligibility else ()
+        return self.repo.rows(f"""SELECT u.*,a.original_company_name,a.source_title,a.source_url,a.evidence_grade,
+            a.original_round,a.quality_issues_json,r.adjudication_type,r.handling_recommendation,
+            GROUP_CONCAT(DISTINCT rel.relation_type) AS duplicate_relations
+          FROM v14_event_units u JOIN v13_candidate_quality_audits a USING(audit_id)
+          LEFT JOIN v14_round_adjudications r USING(audit_id)
+          LEFT JOIN v13_candidate_relations rel ON rel.left_audit_id=a.audit_id OR rel.right_audit_id=a.audit_id
+          {where} GROUP BY u.event_unit_id ORDER BY
+          CASE u.sample_eligibility_status WHEN 'B_pending' THEN 1 WHEN 'C_excluded' THEN 2 ELSE 3 END,
+          u.disclosure_date DESC,u.adjudicated_company_name""", params)
+
+    def v14_summary(self) -> dict[str, Any]:
+        rows=self.repo.rows("SELECT sample_eligibility_status,COUNT(*) n FROM v14_event_units WHERE is_current=1 GROUP BY sample_eligibility_status")
+        result={r["sample_eligibility_status"]:r["n"] for r in rows}
+        result["split_recommended"]=self.repo.rows("SELECT COUNT(*) n FROM v14_event_units WHERE event_structure_status='split_recommended'")[0]["n"]
+        result["merge_sources"]=self.repo.rows("SELECT COUNT(*) n FROM v14_duplicate_decisions WHERE final_decision='merge_sources'")[0]["n"]
+        return result
+
+    def review_v14_event(self, event_unit_id: str, *, action: str, actor: str, reason: str, value: str = "") -> None:
+        allowed={"confirm_company","rename_company","confirm_round","split_event","merge_duplicate","mark_statistical","hold","exclude"}
+        if action not in allowed: raise ValueError("Unsupported V1.4 action")
+        if not actor.strip() or not reason.strip(): raise ValueError("Actor and reason are required")
+        connection=connect(self.path)
+        try:
+            with connection:
+                row=connection.execute("SELECT * FROM v14_event_units WHERE event_unit_id=? AND is_current=1",(event_unit_id,)).fetchone()
+                if not row: raise ValueError("Unknown current event unit")
+                before=dict(row)
+                updates={}
+                if action=="rename_company":
+                    if not value.strip(): raise ValueError("Normalized company name is required")
+                    updates["adjudicated_company_name"]=value.strip()
+                elif action=="confirm_round":
+                    if not value.strip(): raise ValueError("Round is required")
+                    updates["adjudicated_round"]=value.strip()
+                elif action=="mark_statistical": updates.update(sample_eligibility_status="A_statistical",eligibility_reason=reason)
+                elif action=="hold": updates.update(sample_eligibility_status="B_pending",eligibility_reason=reason)
+                elif action=="exclude": updates.update(sample_eligibility_status="C_excluded",eligibility_reason=reason)
+                elif action=="split_event": updates["event_structure_status"]="split_recommended"
+                elif action=="merge_duplicate": updates["event_structure_status"]="duplicate_source"
+                updates.update(decision_status="human_modified",updated_at=now())
+                clause=",".join(f"{k}=?" for k in updates)
+                connection.execute(f"UPDATE v14_event_units SET {clause} WHERE event_unit_id=?",(*updates.values(),event_unit_id))
+                after=dict(connection.execute("SELECT * FROM v14_event_units WHERE event_unit_id=?",(event_unit_id,)).fetchone())
+                action_id=uid()
+                connection.execute("INSERT INTO v14_review_actions VALUES (?,?,?,?,?,?,?,?)",(action_id,event_unit_id,action,actor,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,now()))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor,"v14_"+action,"v14_event_unit",event_unit_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,now()))
+        finally: connection.close()
+
     def funding_events(self, *, category_id: str = "", round_name: str = "", query: str = "") -> list[dict[str, Any]]:
         clauses = ["p.sample_month='2026-11'", "p.inclusion_status='included'"]
         params: list[Any] = []

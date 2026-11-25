@@ -24,6 +24,7 @@ def test_all_internal_pages_render(monkeypatch, tmp_path):
         "app_pages/10_source_coverage.py",
         "app_pages/11_multiplatform_audit.py",
         "app_pages/12_quality_audit.py",
+        "app_pages/13_event_review_queue.py",
     ]:
         at.switch_page(page).run()
         assert not at.exception

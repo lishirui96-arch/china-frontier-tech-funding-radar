@@ -49,6 +49,7 @@ page = st.navigation({
         st.Page("app_pages/10_source_coverage.py", title="来源覆盖审计", icon=":material/travel_explore:", help="查看V1.1来源遍历、交叉重复和新增候选。"),
         st.Page("app_pages/11_multiplatform_audit.py", title="多平台交叉核验", icon=":material/compare_arrows:", help="查看SpaceDaily、36氪、投中、财联社等平台候选及交叉去重结果。"),
         st.Page("app_pages/12_quality_audit.py", title="候选质量审计", icon=":material/fact_check:", help="查看V1.3企业实体、字段级核验、重复冲突及并购核验结果。"),
+        st.Page("app_pages/13_event_review_queue.py", title="融资事件审核队列", icon=":material/playlist_add_check:", help="裁决轮次冲突、重复关系与样本统计资格，所有人工操作写入审计日志。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),
