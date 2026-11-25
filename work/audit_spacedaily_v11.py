@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "work" / "spacedaily_v11_audit.json"
 BASE = "https://fund.spacedaily.com.cn/"
 HEADERS = {"User-Agent": "FundingRadarResearch/1.1 (+public-source-audit; low-frequency)"}
-TARGET_ROUNDS = {"天使轮", "Pre-A", "A轮", "A+轮", "B轮"}
+TARGET_ROUNDS = {"种子轮", "天使轮", "天使+轮", "Pre-A", "Pre-A+", "A轮", "A+轮", "A++轮", "Pre-B", "B轮", "B+轮", "B++轮"}
 
 
 def get(client: httpx.Client, url: str) -> tuple[dict, str]:
@@ -58,6 +58,7 @@ def main() -> None:
             "privacy_link_found": "privacy-policy" in home,
         }
         result["stats"] = {"all_public_records": len(deals), "november_window": len(november), "china_labeled": len(china), "target_or_review_rounds": len(target)}
+        result["november_records"] = november
         result["target_records"] = target
         result["quality_flags"] = [
             "公开记录仅作发现线索，不能直接形成正式事件",

@@ -47,6 +47,7 @@ page = st.navigation({
         st.Page("app_pages/08_candidate_themes.py", title="候选主题库", icon=":material/hub:", help="查看人工审核前的技术关联分组、边界、企业、事件和关键词。"),
         st.Page("app_pages/09_theme_review.py", title="候选主题人工审核", icon=":material/rule:", help="执行候选主题改名、合并、拆分、成员移动和状态决定，所有操作保留审计记录。"),
         st.Page("app_pages/10_source_coverage.py", title="来源覆盖审计", icon=":material/travel_explore:", help="查看V1.1来源遍历、交叉重复和新增候选。"),
+        st.Page("app_pages/11_multiplatform_audit.py", title="多平台交叉核验", icon=":material/compare_arrows:", help="查看SpaceDaily、36氪、投中、财联社等平台候选及交叉去重结果。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),

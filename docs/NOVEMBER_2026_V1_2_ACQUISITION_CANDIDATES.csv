@@ -1,0 +1,3 @@
+﻿acquisition_candidate_id,buyer_name,target_name,disclosure_date,transaction_type,equity_ratio_original,amount_original,transaction_status,source_title,source_url,source_platform,evidence_grade,verification_status,unresolved_fields,created_at
+ce447bae-e99e-54ab-a963-091ccb0fbf35,斯菱智驱,银球科技,2026-11-23,equity_acquisition,75.66%,10.51亿元,announced,将实现全资控股！斯菱智驱拟10.51亿元收购银球科技剩余75.66%股权｜速读公告,https://m.cls.cn/detail/2542326,财联社,B,partially_verified,需补上市公司/交易所公告、董事会审议状态及交割进度,2026-11-25T03:24:21.462954+00:00
+87f93fa7-f798-54f3-a407-90d07746f98b,艾为电子,钰泰半导体,2026-11-22,equity_acquisition,100%,未披露,announced,艾为电子：拟收购模拟芯片公司钰泰半导体100%股份 股票复牌,https://m.cls.cn/detail/2541974,财联社,B,partially_verified,需补上市公司/交易所公告、董事会审议状态及交割进度,2026-11-25T03:24:21.462954+00:00

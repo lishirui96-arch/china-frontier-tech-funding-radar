@@ -39,6 +39,26 @@ class SampleLibraryService:
         result["spacedaily_records"] = self.repo.rows("SELECT COUNT(*) AS n FROM source_event_observations WHERE source_name='SpaceDaily融资数据库'")[0]["n"]
         return result
 
+    def v12_platform_audits(self) -> list[dict[str, Any]]:
+        return self.repo.rows("SELECT * FROM v12_platform_audits ORDER BY platform")
+
+    def v12_candidates(self, platform: str = "", status: str = "") -> list[dict[str, Any]]:
+        clauses = ["1=1"]; params: list[Any] = []
+        if platform:
+            clauses.append("source_platform=?"); params.append(platform)
+        if status:
+            clauses.append("candidate_status=?"); params.append(status)
+        return self.repo.rows(f"SELECT * FROM v12_funding_candidates WHERE {' AND '.join(clauses)} ORDER BY disclosure_date DESC,source_platform,company_name_original",tuple(params))
+
+    def v12_summary(self) -> dict[str, Any]:
+        return self.repo.rows("""SELECT COUNT(*) AS candidate_observations,
+            SUM(candidate_status='new') AS new_candidates,
+            SUM(candidate_status='duplicate_v1_v11') AS duplicates,
+            SUM(verification_status='verified') AS verified,
+            SUM(verification_status='partially_verified') AS partially_verified,
+            SUM(verification_status='pending') AS pending
+          FROM v12_funding_candidates""")[0]
+
     def funding_events(self, *, category_id: str = "", round_name: str = "", query: str = "") -> list[dict[str, Any]]:
         clauses = ["p.sample_month='2026-11'", "p.inclusion_status='included'"]
         params: list[Any] = []
