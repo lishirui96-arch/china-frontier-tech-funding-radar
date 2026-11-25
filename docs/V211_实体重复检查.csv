@@ -1,0 +1,2 @@
+﻿check_id,left_profile_id,right_profile_id,relation_suggestion,match_basis,review_status,left_name,right_name
+79ce77c4-2c6c-5964-8a61-e1d87b57192f,3b130189-43a8-5374-af12-4fa159d852b7,1c2c93cf-12c8-5c19-8658-e55a8fa98520,needs_manual_review,标准化名称相同或存在包含关系,pending,优理奇机器人（UniX AI,优理奇

@@ -373,6 +373,44 @@ class SampleLibraryService:
                 connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor.strip(),"v2_topic_"+action,"v2_candidate_topic",topic_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
         finally: connection.close()
 
+    def v211_profile_reviews(self, quality: str = "") -> list[dict[str, Any]]:
+        where="WHERE r.quality_status=?" if quality else "";params=(quality,) if quality else ()
+        return self.repo.rows(f"""SELECT r.*,p.source_entity_type,p.source_entity_id FROM v211_profile_reviews r
+          JOIN v2_company_profiles p USING(profile_id) {where} ORDER BY r.quality_status,r.suggested_name""",params)
+
+    def v211_duplicate_checks(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT d.*,l.company_name left_name,r.company_name right_name
+          FROM v211_entity_duplicate_checks d JOIN v2_company_profiles l ON l.profile_id=d.left_profile_id
+          JOIN v2_company_profiles r ON r.profile_id=d.right_profile_id ORDER BY left_name,right_name""")
+
+    def v211_shared_reviews(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT s.*,p.company_name FROM v211_shared_company_reviews s
+          JOIN v2_company_profiles p USING(profile_id) ORDER BY s.topic_count DESC,p.company_name""")
+
+    def v211_split_proposals(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT s.*,t.candidate_name source_topic,GROUP_CONCAT(p.company_name) companies
+          FROM v211_split_proposals s JOIN v2_candidate_topics t ON t.topic_id=s.source_topic_id
+          LEFT JOIN v211_split_members m USING(proposal_id) LEFT JOIN v2_company_profiles p USING(profile_id)
+          GROUP BY s.proposal_id ORDER BY source_topic,s.subtopic_name""")
+
+    def review_v211_profile(self, review_id: str, *, action: str, actor: str, reason: str,
+                            business: str, products: str, technologies: str, scenarios: str, chain: str) -> None:
+        if action not in {"confirm","modify","hold"}: raise ValueError("不支持的画像审核动作")
+        if not actor.strip() or not reason.strip(): raise ValueError("审核人和审核理由不能为空")
+        connection=connect(self.path);timestamp=now()
+        try:
+            with connection:
+                row=connection.execute("SELECT * FROM v211_profile_reviews WHERE review_id=?",(review_id,)).fetchone()
+                if not row: raise ValueError("未知画像审核记录")
+                before=dict(row);status={"confirm":"confirmed","modify":"modified","hold":"held"}[action]
+                connection.execute("""UPDATE v211_profile_reviews SET suggested_business=?,suggested_products=?,suggested_technologies=?,
+                  suggested_scenarios=?,suggested_chain=?,review_status=? WHERE review_id=?""",
+                  (business.strip() or "待补充",products.strip() or "待补充",technologies.strip() or "待补充",scenarios.strip() or "待补充",chain.strip() or "待补充",status,review_id))
+                after=dict(connection.execute("SELECT * FROM v211_profile_reviews WHERE review_id=?",(review_id,)).fetchone())
+                connection.execute("INSERT INTO v211_profile_actions VALUES (?,?,?,?,?,?,?,?)",(uid(),review_id,action,actor.strip(),json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,timestamp))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor.strip(),"v211_profile_"+action,"v211_profile_review",review_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
+        finally: connection.close()
+
     def v151_source_scope(self, batch1_only: bool = False) -> list[dict[str, Any]]:
         extra="AND q.queue_class='A' AND q.batch_number=1" if batch1_only else ""
         return self.repo.rows(f"""SELECT s.*,q.queue_class,q.batch_number,q.suggested_company_name,

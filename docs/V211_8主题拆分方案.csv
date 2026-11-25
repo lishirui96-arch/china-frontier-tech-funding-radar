@@ -1,0 +1,21 @@
+﻿proposal_id,source_topic_id,subtopic_name,split_basis,company_count,event_count,formal_count,a_count,b_count,qualifies_multi_company,proposal_status,review_status,source_topic,companies
+8acc6bb3-4889-5b5d-9de1-3fff6c95ab99,e92d0c61-2536-5583-aae1-64d7bd50a9e9,卫星载荷与遥感数据服务,按产品形态、核心技术和产业链环节拆分,2,3,1,0,2,1,multi_company_candidate,pending,商业航天测运控与低成本任务保障,"陕西丝路天图卫星科技有限公司,谱星航天"
+a802acc5-db04-5f9e-8afd-d6a56b292e3b,e92d0c61-2536-5583-aae1-64d7bd50a9e9,商业航天测运控与地面服务,按产品形态、核心技术和产业链环节拆分,1,1,0,0,1,0,single_company_observation,pending,商业航天测运控与低成本任务保障,天链测控
+7277e46d-3379-5cab-8a1f-bdc9c32463c6,e92d0c61-2536-5583-aae1-64d7bd50a9e9,深空动力与任务系统观察项,按产品形态、核心技术和产业链环节拆分,3,3,0,1,2,1,multi_company_candidate,pending,商业航天测运控与低成本任务保障,"致真精密仪器,瑞启深空,北辰航天"
+2a19f51f-0e84-5ca4-81c1-0ecef68772a5,b8e7c401-96e3-5bd4-a5ae-1f48e3696284,固态电池关键材料,按产品形态、核心技术和产业链环节拆分,1,2,0,0,2,0,single_company_observation,pending,固态电池关键材料与规模化装备,蓝固新能源
+4c560da0-aba8-574a-abed-dde3375e66be,b8e7c401-96e3-5bd4-a5ae-1f48e3696284,固态电池量产装备,按产品形态、核心技术和产业链环节拆分,1,1,0,1,0,0,single_company_observation,pending,固态电池关键材料与规模化装备,高能数造
+3f9eeaa6-a892-5c43-8178-c0d1a5531fdd,8f72233c-41ee-57a3-b5b3-1c9fe354d53b,工业与室外场景自主作业机器人,按产品形态、核心技术和产业链环节拆分,5,5,0,5,0,1,multi_company_candidate,pending,室外与工业具身机器人的自主作业系统,"富唯智能,擎天智能,简智机器人,飒智智能,智蜂创元"
+862eac5c-d5be-565b-b9b2-d1432fab6ecd,8f72233c-41ee-57a3-b5b3-1c9fe354d53b,通用人形与服务具身系统,按产品形态、核心技术和产业链环节拆分,4,4,1,3,0,1,multi_company_candidate,pending,室外与工业具身机器人的自主作业系统,"优理奇,优理奇机器人（UniX AI,至简动力,九天创智"
+91856bdc-9b93-581f-abf8-1894126722ae,97d78c15-600e-5d7a-bfa1-950f6f73d05c,ADC与抗体偶联药物,按产品形态、核心技术和产业链环节拆分,2,2,0,1,1,1,multi_company_candidate,pending,核酸、ADC与新型生物药载荷平台,"拓济医药,金领生物"
+0be18fd7-b261-5f5d-85e1-ee5e134a69d4,97d78c15-600e-5d7a-bfa1-950f6f73d05c,其他新型生物药载荷观察项,按产品形态、核心技术和产业链环节拆分,1,1,0,1,0,0,single_company_observation,pending,核酸、ADC与新型生物药载荷平台,湃来生物
+f3438e36-1d54-5334-aeac-6418c811567f,97d78c15-600e-5d7a-bfa1-950f6f73d05c,核酸药物与RNA技术平台,按产品形态、核心技术和产业链环节拆分,2,2,0,2,0,1,multi_company_candidate,pending,核酸、ADC与新型生物药载荷平台,"昂拓生物,砺博生物"
+3c88505d-55ae-5946-b8c2-6d948183c593,40c437a0-9e9a-557c-b522-3b43e75c4b87,临床检测与生命科学仪器,按产品形态、核心技术和产业链环节拆分,2,2,0,2,0,1,multi_company_candidate,pending,生命科学检测与高端分析仪器,"英捷信医疗,景芮医疗"
+096fcd46-9f84-58a0-b420-e840b8692206,40c437a0-9e9a-557c-b522-3b43e75c4b87,质谱与高端分析仪器,按产品形态、核心技术和产业链环节拆分,2,2,0,2,0,1,multi_company_candidate,pending,生命科学检测与高端分析仪器,"瑞莱谱医疗,伯仪集团"
+0f9095b5-67fa-52b5-ad7e-915d6a717a33,e6a8c1ca-86cf-5821-b0eb-a455c17486dd,存算一体与存储架构,按产品形态、核心技术和产业链环节拆分,1,1,0,1,0,0,single_company_observation,pending,端侧AI芯片的能效与系统集成,后摩智能
+cde0e1d9-69f3-5ba8-a06d-0af836ed5ff5,e6a8c1ca-86cf-5821-b0eb-a455c17486dd,端侧推理芯片与系统集成,按产品形态、核心技术和产业链环节拆分,7,7,0,6,1,1,multi_company_candidate,pending,端侧AI芯片的能效与系统集成,"诚恒微,凌川科技,灵睿智芯,泛函数,通芯智能,奕泰智能,NovaSilicon"
+5c46a573-acab-59b3-8b84-25eec3ef3f54,4377165a-601e-593d-a88c-41aca0cb10cf,AI药物与RNA结构设计,按产品形态、核心技术和产业链环节拆分,2,2,0,1,1,1,multi_company_candidate,pending,虚拟细胞与AI药物设计的实验闭环,"途深智合,砺博生物"
+db2dadc1-4757-5d69-9a32-8072bc281fe8,4377165a-601e-593d-a88c-41aca0cb10cf,虚拟细胞与生物基础模型,按产品形态、核心技术和产业链环节拆分,2,2,1,1,0,1,multi_company_candidate,pending,虚拟细胞与AI药物设计的实验闭环,"无界进化,元示科技"
+3a0678de-5439-58ad-8783-137cc42e50ff,9944c94b-8a4d-5bf1-889c-aea3db0758f5,其他功能材料观察项,按产品形态、核心技术和产业链环节拆分,4,4,3,1,0,0,needs_manual_split,pending,高性能功能材料的国产化与工程验证,"国科炭美,纳宇半导体材料（宁波）有限责任公司,化合积电（厦门）半导体科技有限公司,北京临一云川能源技术有限公司"
+0b80efe5-a128-5521-b8b8-30a80027b8bc,9944c94b-8a4d-5bf1-889c-aea3db0758f5,固态电池电解质材料,按产品形态、核心技术和产业链环节拆分,1,1,0,0,1,0,single_company_observation,pending,高性能功能材料的国产化与工程验证,蓝固新能源
+fc0d2601-5b18-5e5b-861a-6697157ef4aa,9944c94b-8a4d-5bf1-889c-aea3db0758f5,特种防护与功能涂层,按产品形态、核心技术和产业链环节拆分,1,1,0,1,0,0,single_company_observation,pending,高性能功能材料的国产化与工程验证,盖科材料
+a8222e7b-b586-5839-aab6-55a3a90ad1e0,9944c94b-8a4d-5bf1-889c-aea3db0758f5,高性能磁性材料,按产品形态、核心技术和产业链环节拆分,1,1,0,1,0,0,single_company_observation,pending,高性能功能材料的国产化与工程验证,辰达新材

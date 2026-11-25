@@ -56,6 +56,7 @@ page = st.navigation({
         st.Page("app_pages/17_project_progress.py", title="项目进度与研究口径", icon=":material/checklist:", help="查看V1.5.1投资界/SpaceDaily来源口径、11月1日至25日范围及人工审核进度。"),
         st.Page("app_pages/18_v2_theme_workbench.py", title="科技融资主题工作台", icon=":material/account_tree:", help="按核心产品、技术和产业链问题审核V2候选主题。"),
         st.Page("app_pages/19_v2_database_preview.py", title="科技融资数据库预览", icon=":material/database:", help="在内部预览正式、A类与B类融资事件，状态分开显示。"),
+        st.Page("app_pages/20_v211_profile_review.py", title="企业技术画像复核", icon=":material/manage_search:", help="复核企业业务、产品、技术、产业链及主题依据；默认不提交决定。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),
