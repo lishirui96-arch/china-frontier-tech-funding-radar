@@ -59,6 +59,7 @@ page = st.navigation({
         st.Page("app_pages/20_v211_profile_review.py", title="企业技术画像复核", icon=":material/manage_search:", help="复核企业业务、产品、技术、产业链及主题依据；默认不提交决定。"),
         st.Page("app_pages/21_v22_taxonomy.py", title="V2.2三级分类管理", icon=":material/schema:", help="按10个一级产业、二级领域和三级候选主题管理企业与事件关联。"),
         st.Page("app_pages/22_v23_topic_adjudication.py", title="V2.3主题人工裁决", icon=":material/gavel:", help="审核多企业主题、观察项、合并预览和待拆分主题；所有决定需人工提交。"),
+        st.Page("app_pages/23_v231_admission_review.py", title="V2.3.1主题准入审查", icon=":material/fact_check:", help="查看14个拟确认主题的第二轮质量审查、成员证据等级、实体重复和主题交叉建议。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),

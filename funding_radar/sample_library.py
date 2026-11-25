@@ -16,6 +16,41 @@ class SampleLibraryService:
     def categories(self) -> list[dict[str, Any]]:
         return self.repo.rows("SELECT * FROM industry_categories WHERE is_active=1 ORDER BY sort_order")
 
+    def v231_admission_reviews(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT r.*,t.candidate_name,t.technical_boundary,
+            f.name AS field_name,i.name AS industry_name
+          FROM v231_topic_admission_reviews r
+          JOIN v22_topics t ON t.topic_id=r.source_topic_id
+          JOIN v22_fields f ON f.field_id=t.field_id
+          JOIN v22_industries i ON i.industry_id=f.industry_id
+          ORDER BY i.sort_order,f.sort_order,t.candidate_name""")
+
+    def v231_member_quality(self, topic_id: str = "") -> list[dict[str, Any]]:
+        where = "WHERE q.source_topic_id=?" if topic_id else ""
+        params = (topic_id,) if topic_id else ()
+        return self.repo.rows(f"""SELECT q.*,t.candidate_name,c.display_name,
+            p.primary_business,l.product_basis,l.technology_basis,l.evidence_basis,
+            p.evidence_urls_json
+          FROM v231_member_quality q
+          JOIN v22_topics t ON t.topic_id=q.source_topic_id
+          JOIN v22_companies c USING(company_id)
+          JOIN v22_company_profiles p USING(company_id)
+          JOIN v22_company_topic_links l ON l.topic_id=q.source_topic_id AND l.company_id=q.company_id
+          {where} ORDER BY t.candidate_name,c.display_name""", params)
+
+    def v231_entity_reviews(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT r.*,l.display_name AS left_name,
+            rr.display_name AS right_name FROM v231_entity_reviews r
+          JOIN v22_companies l ON l.company_id=r.left_company_id
+          JOIN v22_companies rr ON rr.company_id=r.right_company_id
+          ORDER BY l.display_name,rr.display_name""")
+
+    def v231_cross_topic_reviews(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT r.*,c.display_name,t.candidate_name
+          FROM v231_cross_topic_reviews r JOIN v22_companies c USING(company_id)
+          JOIN v22_topics t ON t.topic_id=r.source_topic_id
+          ORDER BY c.display_name,t.candidate_name""")
+
     def source_coverage(self) -> list[dict[str, Any]]:
         return self.repo.rows("""SELECT r.source_name,r.source_column,COUNT(DISTINCT p.page_id) AS pages_traversed,
             SUM(p.article_count) AS articles_seen,

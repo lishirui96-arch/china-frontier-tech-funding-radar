@@ -1,0 +1,6 @@
+﻿company_id,source_topic_id,relationship_assessment,product_basis,technology_basis,recommendation,display_name,candidate_name
+5b4a303e-ec3d-50ed-a37a-82f75e2d5ce6,48b7115b-7495-50e0-ac0c-de9c6b57bfd9,合理交叉需由不同产品或技术能力支持,Wanda|Panther,UniFlex泛化模仿学习|UniTouch视触觉融合|UniCortex长序列任务规划|UniTac多模态触觉|自研关节模组|仿生机械臂,保留并补充产品级依据,优理奇,机器人视触觉与精密感知
+5b4a303e-ec3d-50ed-a37a-82f75e2d5ce6,920b94f7-3083-5f24-9489-8f71582e8be9,合理交叉需由不同产品或技术能力支持,Wanda|Panther,UniFlex泛化模仿学习|UniTouch视触觉融合|UniCortex长序列任务规划|UniTac多模态触觉|自研关节模组|仿生机械臂,保留并补充产品级依据,优理奇,通用人形与服务具身系统
+02294527-ebac-5cd6-b430-a7cfcfe86fb2,e7a67649-76a4-5c5c-94a6-7beef9fd38ee,合理交叉需由不同产品或技术能力支持,芯片化多波长光源与光互连解决方案,光频梳多波长光源、CPO/OIO,保留并补充产品级依据,启明光子（北京）科技有限公司,AI算力集群的光互连与硅光交换
+090e820d-8a3c-54eb-b7de-14c066ef98ed,595316ba-c5d8-5f04-a3c0-f908e822b8e4,合理交叉需由不同产品或技术能力支持,生命科学产品或研发平台,生物实验、药物研发与临床转化,保留并补充产品级依据,砺博生物,AI药物与RNA结构设计
+090e820d-8a3c-54eb-b7de-14c066ef98ed,c8685470-7c65-540e-8875-edc3eae7fd40,合理交叉需由不同产品或技术能力支持,生命科学产品或研发平台,生物实验、药物研发与临床转化,保留并补充产品级依据,砺博生物,核酸药物与RNA技术平台
