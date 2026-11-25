@@ -54,6 +54,8 @@ page = st.navigation({
         st.Page("app_pages/15_acquisition_review.py", title="并购人工审核", icon=":material/account_balance:", help="人工确认并购交易阶段，严格区分拟收购、审议、审批和交割。"),
         st.Page("app_pages/16_confirmed_statistics.py", title="正式样本统计与技术分析", icon=":material/analytics:", help="仅统计人工确认纳入的正式月度样本，并准备企业技术画像。"),
         st.Page("app_pages/17_project_progress.py", title="项目进度与研究口径", icon=":material/checklist:", help="查看V1.5.1投资界/SpaceDaily来源口径、11月1日至25日范围及人工审核进度。"),
+        st.Page("app_pages/18_v2_theme_workbench.py", title="科技融资主题工作台", icon=":material/account_tree:", help="按核心产品、技术和产业链问题审核V2候选主题。"),
+        st.Page("app_pages/19_v2_database_preview.py", title="科技融资数据库预览", icon=":material/database:", help="在内部预览正式、A类与B类融资事件，状态分开显示。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),

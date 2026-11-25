@@ -262,6 +262,46 @@ class SampleLibraryService:
         result["technology_classified"]=self.repo.rows("SELECT COUNT(*) n FROM v15_technology_analysis")[0]["n"]
         return result
 
+    def v2_theme_summary(self) -> dict[str, Any]:
+        return self.repo.rows("""SELECT
+          (SELECT COUNT(*) FROM v2_company_profiles) profile_count,
+          (SELECT COUNT(DISTINCT company_name) FROM v2_company_profiles) company_count,
+          (SELECT COUNT(*) FROM v2_industry_directions) industry_count,
+          (SELECT COUNT(*) FROM v2_technology_fields) field_count,
+          (SELECT COUNT(*) FROM v2_candidate_topics) topic_count,
+          (SELECT COUNT(*) FROM v2_candidate_topics WHERE topic_kind='single_company_observation') observation_count,
+          (SELECT COUNT(*) FROM v2_company_profiles WHERE profile_status='pending_supplement') unclassified_count,
+          (SELECT COUNT(DISTINCT event_ref) FROM v2_event_topic_links WHERE event_source_type='formal') formal_events,
+          (SELECT COUNT(DISTINCT event_ref) FROM v2_event_topic_links WHERE event_source_type='A_candidate') a_events,
+          (SELECT COUNT(DISTINCT event_ref) FROM v2_event_topic_links WHERE event_source_type='B_candidate') b_events""")[0]
+
+    def v2_topics(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT t.*,i.name industry_name,f.name field_name,
+          COUNT(DISTINCT l.profile_id) company_count,COUNT(DISTINCT e.event_ref) event_count,
+          COUNT(DISTINCT CASE WHEN e.event_source_type='formal' THEN e.event_ref END) formal_count,
+          COUNT(DISTINCT CASE WHEN e.event_source_type='A_candidate' THEN e.event_ref END) a_count,
+          COUNT(DISTINCT CASE WHEN e.event_source_type='B_candidate' THEN e.event_ref END) b_count,
+          GROUP_CONCAT(DISTINCT p.company_name) companies,GROUP_CONCAT(DISTINCT e.round_original) rounds
+          FROM v2_candidate_topics t JOIN v2_industry_directions i USING(industry_id)
+          JOIN v2_technology_fields f USING(field_id)
+          LEFT JOIN v2_company_topic_links l ON l.topic_id=t.topic_id AND l.is_current=1
+          LEFT JOIN v2_company_profiles p USING(profile_id) LEFT JOIN v2_event_topic_links e USING(topic_id)
+          GROUP BY t.topic_id ORDER BY company_count DESC,event_count DESC,t.candidate_name""")
+
+    def v2_profiles(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT p.*,i.name industry_name,f.name field_name,
+          GROUP_CONCAT(DISTINCT t.candidate_name) topics
+          FROM v2_company_profiles p JOIN v2_industry_directions i USING(industry_id)
+          JOIN v2_technology_fields f USING(field_id)
+          LEFT JOIN v2_company_topic_links l ON l.profile_id=p.profile_id AND l.is_current=1
+          LEFT JOIN v2_candidate_topics t USING(topic_id) GROUP BY p.profile_id
+          ORDER BY i.sort_order,p.company_name""")
+
+    def v2_events(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT e.*,GROUP_CONCAT(DISTINCT t.candidate_name) topics
+          FROM v2_event_topic_links e JOIN v2_candidate_topics t USING(topic_id)
+          GROUP BY e.event_source_type,e.event_ref ORDER BY e.disclosure_date DESC,e.company_name""")
+
     def v151_source_scope(self, batch1_only: bool = False) -> list[dict[str, Any]]:
         extra="AND q.queue_class='A' AND q.batch_number=1" if batch1_only else ""
         return self.repo.rows(f"""SELECT s.*,q.queue_class,q.batch_number,q.suggested_company_name,

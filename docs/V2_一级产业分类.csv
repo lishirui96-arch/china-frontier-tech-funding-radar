@@ -1,0 +1,9 @@
+﻿industry_id,name,description,sort_order
+robotics,机器人与具身智能,V2.0技术主题导航入口,1
+ai-compute,AI芯片与先进计算,V2.0技术主题导航入口,2
+advanced-manufacturing,高端装备与先进制造,V2.0技术主题导航入口,3
+energy-materials,新能源与新材料,V2.0技术主题导航入口,4
+aerospace,商业航天与低空经济,V2.0技术主题导航入口,5
+life-science,生物制造与生命科学,V2.0技术主题导航入口,6
+quantum,量子科技,V2.0技术主题导航入口,7
+other,其他新兴技术,V2.0技术主题导航入口,8

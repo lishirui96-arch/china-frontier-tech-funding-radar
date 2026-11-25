@@ -16,15 +16,15 @@ from tests.conftest import add_company, add_document, add_event, add_required_ev
 
 
 def test_empty_database_migrates_to_latest(db):
-    assert migrate(db) == 9
+    assert migrate(db) == 10
     with connect(db) as c:
-        assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 9
+        assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 10
 
 
 def test_migration_is_idempotent(db):
     migrate(db); migrate(db)
     with connect(db) as c:
-        assert c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 9
+        assert c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 10
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='source_audit_runs'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v12_funding_candidates'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v13_candidate_quality_audits'").fetchone()[0] == 1
