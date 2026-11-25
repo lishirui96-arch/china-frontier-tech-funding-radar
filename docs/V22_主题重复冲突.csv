@@ -1,0 +1,3 @@
+﻿relation_id,left_topic_id,right_topic_id,relation_type,recommendation,reason,review_status,left_name,right_name
+4a1f06e8-e7f8-5c52-8dd4-cf3ac70bcd03,23e32666-f6e1-5226-afed-00e27ccce496,b39f7a86-6ce5-5deb-8e73-db4dfc34f5ae,conceptual_duplicate,建议合并,来源主题与拆分子组表达同一技术问题，保留两条来源记录等待人工确认,pending,卫星载荷与定量遥感数据链,卫星载荷与遥感数据服务
+251476e0-ab7e-5964-94af-8d0d3cde4728,9c9c85ab-2abf-5df2-984f-6bfb0a6a4d05,80c0b2e6-8730-5b1f-bc63-efabc0080c79,conceptual_duplicate,建议合并,来源主题与拆分子组表达同一技术问题，保留两条来源记录等待人工确认,pending,固态电池关键材料,固态电池电解质材料

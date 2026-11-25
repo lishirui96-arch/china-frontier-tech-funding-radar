@@ -1,0 +1,14 @@
+﻿company_id,display_name,candidate_name,link_role,product_basis,technology_basis
+5b4a303e-ec3d-50ed-a37a-82f75e2d5ce6,优理奇,机器人关节执行与高密度机电集成,primary_candidate,Wanda|Panther,UniFlex泛化模仿学习|UniTouch视触觉融合|UniCortex长序列任务规划|UniTac多模态触觉|自研关节模组|仿生机械臂
+5b4a303e-ec3d-50ed-a37a-82f75e2d5ce6,优理奇,机器人视触觉与精密感知,primary_candidate,Wanda|Panther,UniFlex泛化模仿学习|UniTouch视触觉融合|UniCortex长序列任务规划|UniTac多模态触觉|自研关节模组|仿生机械臂
+5b4a303e-ec3d-50ed-a37a-82f75e2d5ce6,优理奇,通用人形与服务具身系统,primary_candidate,Wanda|Panther,UniFlex泛化模仿学习|UniTouch视触觉融合|UniCortex长序列任务规划|UniTac多模态触觉|自研关节模组|仿生机械臂
+02294527-ebac-5cd6-b430-a7cfcfe86fb2,启明光子（北京）科技有限公司,AI算力与模型运行基础设施,primary_candidate,芯片化多波长光源与光互连解决方案,光频梳多波长光源、CPO/OIO
+02294527-ebac-5cd6-b430-a7cfcfe86fb2,启明光子（北京）科技有限公司,AI算力集群的光互连与硅光交换,primary_candidate,芯片化多波长光源与光互连解决方案,光频梳多波长光源、CPO/OIO
+090e820d-8a3c-54eb-b7de-14c066ef98ed,砺博生物,AI药物与RNA结构设计,primary_candidate,生命科学产品或研发平台,生物实验、药物研发与临床转化
+090e820d-8a3c-54eb-b7de-14c066ef98ed,砺博生物,核酸药物与RNA技术平台,primary_candidate,生命科学产品或研发平台,生物实验、药物研发与临床转化
+c1b623e3-0bb8-57a9-bd14-9204c00ee8ef,蓝固新能源,固态电池关键材料,primary_candidate,电池材料或制造装备,材料界面、工艺放大与制造一致性
+c1b623e3-0bb8-57a9-bd14-9204c00ee8ef,蓝固新能源,固态电池电解质材料,primary_candidate,电池材料或制造装备,材料界面、工艺放大与制造一致性
+99eca7de-4c3d-5f82-88f9-fe66594b434b,谱星航天,卫星载荷与定量遥感数据链,primary_candidate,待补充,待补充
+99eca7de-4c3d-5f82-88f9-fe66594b434b,谱星航天,卫星载荷与遥感数据服务,primary_candidate,待补充,待补充
+4355710a-8073-5786-8e80-77cf45a0c4b0,陕西丝路天图卫星科技有限公司,卫星载荷与定量遥感数据链,primary_candidate,卫星遥感数智生态服务,星+云+AI遥感数据采集、云端处理与智能分析
+4355710a-8073-5786-8e80-77cf45a0c4b0,陕西丝路天图卫星科技有限公司,卫星载荷与遥感数据服务,primary_candidate,卫星遥感数智生态服务,星+云+AI遥感数据采集、云端处理与智能分析

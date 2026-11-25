@@ -32,6 +32,7 @@ def test_all_internal_pages_render(monkeypatch, tmp_path):
         "app_pages/18_v2_theme_workbench.py",
         "app_pages/19_v2_database_preview.py",
         "app_pages/20_v211_profile_review.py",
+        "app_pages/21_v22_taxonomy.py",
     ]:
         at.switch_page(page).run()
         assert not at.exception

@@ -1,0 +1,11 @@
+﻿industry_id,code,name,sort_order,review_status
+c0983de5-d08f-53b8-901c-d750f8e863c2,01,机器人与具身智能,1,confirmed_by_user
+c9a16792-5f10-51fb-9437-875c75b8a7f0,02,AI计算与半导体,2,confirmed_by_user
+31fc4a30-6fb7-5de4-a08f-ea66cf052e26,03,AI软件与工业智能,3,confirmed_by_user
+d97f43a8-6431-53ab-8a0f-7b249293c6ec,04,新能源与先进材料,4,confirmed_by_user
+596a5389-b98a-5194-80d4-6aab5261f7bc,05,高端装备与先进制造,5,confirmed_by_user
+bbafb4a9-0ee3-539a-b811-15fd47677373,06,商业航天与卫星应用,6,confirmed_by_user
+5d20ce7f-cb8d-50fe-8b72-518666a7dce3,07,低空经济与无人系统,7,confirmed_by_user
+8ed1f51f-0901-5b42-bac7-06ce139ce2a9,08,生物制造与生命科学,8,confirmed_by_user
+04bdd201-fbd8-5c25-a946-0630f8102dcf,09,脑科学与神经技术,9,confirmed_by_user
+d4dd4d83-cdd5-5d28-ad3f-41da33a7fd3a,10,量子科技,10,confirmed_by_user

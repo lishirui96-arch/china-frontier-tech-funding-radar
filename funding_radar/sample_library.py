@@ -411,6 +411,66 @@ class SampleLibraryService:
                 connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor.strip(),"v211_profile_"+action,"v211_profile_review",review_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
         finally: connection.close()
 
+    def v22_taxonomy_tree(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT i.code,i.name industry_name,f.name field_name,t.*,
+          COUNT(DISTINCT l.company_id) company_count,COUNT(DISTINCT et.event_id) event_count,
+          COUNT(DISTINCT CASE WHEN e.data_status='formal' THEN e.event_id END) formal_count,
+          COUNT(DISTINCT CASE WHEN e.data_status='A_candidate' THEN e.event_id END) a_count,
+          COUNT(DISTINCT CASE WHEN e.data_status='B_candidate' THEN e.event_id END) b_count,
+          GROUP_CONCAT(DISTINCT c.display_name) companies,GROUP_CONCAT(DISTINCT g.tag) tags
+          FROM v22_topics t JOIN v22_fields f USING(field_id) JOIN v22_industries i USING(industry_id)
+          LEFT JOIN v22_company_topic_links l USING(topic_id) LEFT JOIN v22_companies c USING(company_id)
+          LEFT JOIN v22_company_tags g USING(company_id) LEFT JOIN v22_event_topics et USING(topic_id)
+          LEFT JOIN v22_events e USING(event_id) GROUP BY t.topic_id ORDER BY i.sort_order,f.sort_order,t.candidate_name""")
+
+    def v22_company_classifications(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT c.company_id,c.display_name,c.entity_status,p.*,i.name industry_name,f.name field_name,t.candidate_name primary_topic,
+          GROUP_CONCAT(DISTINCT x.candidate_name) linked_topics,GROUP_CONCAT(DISTINCT g.tag) auxiliary_tags
+          FROM v22_companies c JOIN v22_company_profiles p USING(company_id)
+          LEFT JOIN v22_industries i ON i.industry_id=p.primary_industry_id LEFT JOIN v22_fields f ON f.field_id=p.primary_field_id
+          LEFT JOIN v22_topics t ON t.topic_id=p.primary_topic_id LEFT JOIN v22_company_topic_links l USING(company_id)
+          LEFT JOIN v22_topics x ON x.topic_id=l.topic_id LEFT JOIN v22_company_tags g USING(company_id)
+          GROUP BY c.company_id ORDER BY p.classification_status,c.display_name""")
+
+    def v22_topic_relations(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT r.*,l.candidate_name left_name,x.candidate_name right_name
+          FROM v22_topic_relations r JOIN v22_topics l ON l.topic_id=r.left_topic_id
+          JOIN v22_topics x ON x.topic_id=r.right_topic_id ORDER BY r.relation_type,left_name""")
+
+    def review_v22_topic(self, topic_id: str, *, action: str, actor: str, reason: str, value: str = "", company_id: str = "") -> None:
+        allowed={"confirm_multi","confirm_observation","hold_split","exclude","rename","change_field","merge_suggestion","split_suggestion","move_company","add_tag"}
+        if action not in allowed: raise ValueError("不支持的V2.2操作")
+        if not actor.strip() or not reason.strip(): raise ValueError("审核人和审核依据不能为空")
+        connection=connect(self.path);timestamp=now()
+        try:
+            with connection:
+                row=connection.execute("SELECT * FROM v22_topics WHERE topic_id=?",(topic_id,)).fetchone()
+                if not row: raise ValueError("未知V2.2主题")
+                before=dict(row)
+                if action=="confirm_multi": connection.execute("UPDATE v22_topics SET management_status='A_multi_company',review_status='confirmed',updated_at=? WHERE topic_id=?",(timestamp,topic_id))
+                elif action=="confirm_observation": connection.execute("UPDATE v22_topics SET management_status='B_observation',review_status='confirmed',updated_at=? WHERE topic_id=?",(timestamp,topic_id))
+                elif action=="hold_split": connection.execute("UPDATE v22_topics SET management_status='C_needs_further_split',review_status='held',updated_at=? WHERE topic_id=?",(timestamp,topic_id))
+                elif action=="exclude": connection.execute("UPDATE v22_topics SET review_status='excluded',updated_at=? WHERE topic_id=?",(timestamp,topic_id))
+                elif action=="rename":
+                    if not value.strip(): raise ValueError("新名称不能为空")
+                    connection.execute("UPDATE v22_topics SET candidate_name=?,updated_at=? WHERE topic_id=?",(value.strip(),timestamp,topic_id))
+                elif action=="change_field":
+                    if not connection.execute("SELECT 1 FROM v22_fields WHERE field_id=?",(value,)).fetchone(): raise ValueError("目标领域无效")
+                    connection.execute("UPDATE v22_topics SET field_id=?,updated_at=? WHERE topic_id=?",(value,timestamp,topic_id))
+                elif action=="move_company":
+                    if not company_id or not value: raise ValueError("请选择企业与目标主题")
+                    link=connection.execute("SELECT * FROM v22_company_topic_links WHERE company_id=? AND topic_id=?",(company_id,topic_id)).fetchone()
+                    if not link: raise ValueError("企业不属于当前主题")
+                    connection.execute("DELETE FROM v22_company_topic_links WHERE company_id=? AND topic_id=?",(company_id,topic_id))
+                    connection.execute("INSERT OR REPLACE INTO v22_company_topic_links VALUES (?,?,?,?,?,?,?)",(company_id,value,link["link_role"],link["product_basis"],link["technology_basis"],reason,"pending"))
+                elif action=="add_tag":
+                    if not company_id or not value.strip(): raise ValueError("请选择企业并输入标签")
+                    connection.execute("INSERT OR REPLACE INTO v22_company_tags VALUES (?,?,?,?)",(company_id,value.strip(),reason,"pending"))
+                after=dict(connection.execute("SELECT * FROM v22_topics WHERE topic_id=?",(topic_id,)).fetchone())
+                connection.execute("INSERT INTO v22_topic_history VALUES (?,?,?,?,?,?,?,?)",(uid(),topic_id,action,actor.strip(),json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,timestamp))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",(uid(),actor.strip(),"v22_"+action,"v22_topic",topic_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
+        finally: connection.close()
+
     def v151_source_scope(self, batch1_only: bool = False) -> list[dict[str, Any]]:
         extra="AND q.queue_class='A' AND q.batch_number=1" if batch1_only else ""
         return self.repo.rows(f"""SELECT s.*,q.queue_class,q.batch_number,q.suggested_company_name,
