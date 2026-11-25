@@ -59,6 +59,52 @@ class SampleLibraryService:
             SUM(verification_status='pending') AS pending
           FROM v12_funding_candidates""")[0]
 
+    def v13_summary(self) -> dict[str, Any]:
+        summary = self.repo.rows("""SELECT COUNT(*) AS candidates,
+            SUM(name_quality_status='accurate') AS accurate_names,
+            SUM(name_quality_status='corrected') AS corrected_names,
+            SUM(name_quality_status IN ('suspected_error','pending')) AS unresolved_names,
+            SUM(overall_verification_status='complete') AS complete,
+            SUM(overall_verification_status='partial') AS partial,
+            SUM(overall_verification_status='pending') AS pending,
+            SUM(overall_verification_status='conflict') AS conflicts
+          FROM v13_candidate_quality_audits""")[0]
+        summary["companies"] = self.repo.rows("SELECT COUNT(*) AS n FROM v13_company_entities")[0]["n"]
+        summary["confirmed_duplicates"] = self.repo.rows(
+            "SELECT COUNT(*) AS n FROM v13_candidate_relations WHERE relation_type='confirmed_duplicate'"
+        )[0]["n"]
+        return summary
+
+    def v13_candidate_audits(self, status: str = "") -> list[dict[str, Any]]:
+        where = "WHERE overall_verification_status=?" if status else ""
+        params = (status,) if status else ()
+        return self.repo.rows(f"""SELECT * FROM v13_candidate_quality_audits {where}
+          ORDER BY normalized_disclosure_date DESC,normalized_company_name""", params)
+
+    def v13_field_verifications(self, field_name: str = "", status: str = "") -> list[dict[str, Any]]:
+        clauses = ["1=1"]
+        params: list[Any] = []
+        if field_name:
+            clauses.append("v.field_name=?"); params.append(field_name)
+        if status:
+            clauses.append("v.verification_status=?"); params.append(status)
+        return self.repo.rows(f"""SELECT a.normalized_company_name,a.normalized_disclosure_date,
+            a.normalized_round,v.* FROM v13_field_verifications v
+          JOIN v13_candidate_quality_audits a USING(audit_id)
+          WHERE {' AND '.join(clauses)} ORDER BY a.normalized_company_name,v.field_name""", tuple(params))
+
+    def v13_relations(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT r.*,l.normalized_company_name AS left_company,
+            l.normalized_round AS left_round,x.normalized_company_name AS right_company,
+            x.normalized_round AS right_round
+          FROM v13_candidate_relations r
+          JOIN v13_candidate_quality_audits l ON l.audit_id=r.left_audit_id
+          JOIN v13_candidate_quality_audits x ON x.audit_id=r.right_audit_id
+          ORDER BY r.relation_type,l.normalized_company_name""")
+
+    def v13_acquisition_verifications(self) -> list[dict[str, Any]]:
+        return self.repo.rows("SELECT * FROM v13_acquisition_verifications ORDER BY first_announcement_date DESC,buyer_name")
+
     def funding_events(self, *, category_id: str = "", round_name: str = "", query: str = "") -> list[dict[str, Any]]:
         clauses = ["p.sample_month='2026-11'", "p.inclusion_status='included'"]
         params: list[Any] = []
