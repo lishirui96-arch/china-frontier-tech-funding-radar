@@ -10,7 +10,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "work" / "november_workbook_data.json"
-OUTPUT = ROOT / "docs" / "NOVEMBER_2026_TECH_FINANCING_MA_SAMPLE_LIBRARY_V1.xlsx"
+OUTPUT = ROOT / "docs" / "NOVEMBER_2026_TECH_FINANCING_MA_SAMPLE_LIBRARY_V1_1.xlsx"
 
 
 def main() -> None:
@@ -63,7 +63,7 @@ def main() -> None:
     check = load_workbook(OUTPUT,read_only=False,data_only=False)
     result = {sheet.title: sheet.max_row-4 for sheet in check.worksheets}
     assert list(result) == list(payload["sheets"])
-    assert result["融资事件明细"] == 22 and result["并购事件明细"] == 6
+    assert result["融资事件明细"] >= 22 and result["并购事件明细"] == 6
     check.close()
     print(json.dumps({"path":str(OUTPUT),"sheets":result,"bytes":OUTPUT.stat().st_size},ensure_ascii=False))
 

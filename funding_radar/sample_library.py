@@ -16,6 +16,29 @@ class SampleLibraryService:
     def categories(self) -> list[dict[str, Any]]:
         return self.repo.rows("SELECT * FROM industry_categories WHERE is_active=1 ORDER BY sort_order")
 
+    def source_coverage(self) -> list[dict[str, Any]]:
+        return self.repo.rows("""SELECT r.source_name,r.source_column,COUNT(DISTINCT p.page_id) AS pages_traversed,
+            SUM(p.article_count) AS articles_seen,
+            SUM(CASE WHEN p.http_status=200 THEN 0 ELSE 1 END) AS inaccessible_pages,
+            MIN(p.oldest_date) AS oldest_date,MAX(p.newest_date) AS newest_date
+          FROM source_audit_runs r LEFT JOIN source_audit_pages p USING(run_id)
+          GROUP BY r.run_id ORDER BY r.source_name,r.source_column""")
+
+    def v11_candidates(self, status: str = "") -> list[dict[str, Any]]:
+        where = "WHERE c.candidate_status=?" if status else ""
+        params = (status,) if status else ()
+        return self.repo.rows(f"""SELECT c.*,d.title,d.original_url,a.source_column,a.original_access_status
+          FROM v11_funding_candidates c JOIN raw_documents d ON d.document_id=c.source_document_id
+          LEFT JOIN source_document_audit a USING(document_id) {where}
+          ORDER BY c.disclosure_date DESC,c.company_name_original""", params)
+
+    def v11_summary(self) -> dict[str, Any]:
+        rows = self.repo.rows("SELECT candidate_status,COUNT(*) AS n FROM v11_funding_candidates GROUP BY candidate_status")
+        result = {row["candidate_status"]: row["n"] for row in rows}
+        result["pedaily_documents"] = self.repo.rows("SELECT COUNT(*) AS n FROM source_document_audit WHERE discovery_channel='投资界公开分页'")[0]["n"]
+        result["spacedaily_records"] = self.repo.rows("SELECT COUNT(*) AS n FROM source_event_observations WHERE source_name='SpaceDaily融资数据库'")[0]["n"]
+        return result
+
     def funding_events(self, *, category_id: str = "", round_name: str = "", query: str = "") -> list[dict[str, Any]]:
         clauses = ["p.sample_month='2026-11'", "p.inclusion_status='included'"]
         params: list[Any] = []

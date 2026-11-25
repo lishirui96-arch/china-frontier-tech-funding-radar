@@ -18,6 +18,15 @@ def matrix(rows: list[dict], columns: list[tuple[str,str]]) -> list[list]:
 def main() -> None:
     service = SampleLibraryService()
     funding = service.funding_events()
+    v11_candidates = service.v11_candidates("verified_new")
+    funding.extend([{
+        "event_id": row["candidate_id"], "announcement_date": row["disclosure_date"], "transaction_date": None,
+        "company_name": row["company_name_original"], "primary_category": "待人工复核", "secondary_track": "待人工复核",
+        "financing_type": "candidate", "round_original": row["round_original"], "normalized_round": row["round_normalized"],
+        "amount_original": row["amount_original"], "normalized_amount_cny": None, "investors": "待人工复核",
+        "use_of_funds_original": None, "source_title": row["title"], "source_url": row["original_url"],
+        "evidence_grade": row["evidence_grade"], "review_status": "V1.1新增候选，待人工审核",
+    } for row in v11_candidates])
     acquisitions = service.acquisitions()
     profiles = service.technology_profiles()
     keywords = service.keywords()
@@ -44,6 +53,8 @@ def main() -> None:
     for row in grade_stats:
         stats.append(["证据等级",row["label"],row["event_count"],None,None,None,None,None])
     stats.append(["并购", "全部并购候选",len(acquisitions),len({r["target_company_id"] for r in acquisitions}),None,sum(r["normalized_amount_cny"] is not None for r in acquisitions),sum(r["normalized_amount_cny"] or 0 for r in acquisitions),sum(r["normalized_amount_cny"] is not None for r in acquisitions)/len(acquisitions) if acquisitions else None])
+    stats.append(["V1.1来源审计", "投资界新增候选（待人工审核）",len(v11_candidates),len({r["company_name_original"] for r in v11_candidates}),None,None,None,None])
+    stats.append(["V1.1来源审计", "与V1.0重复",len(service.v11_candidates("duplicate_v1")),None,None,None,None,None])
     sheets = {
         "融资事件明细": matrix(funding,[("event_id","event_id"),("announcement_date","披露日期"),("transaction_date","交易日期"),("company_name","企业名称"),("primary_category","一级产业方向"),("secondary_track","二级赛道"),("financing_type","融资类型"),("round_original","融资轮次原文"),("normalized_round","标准化轮次"),("amount_original","融资金额原文"),("normalized_amount_cny","统一金额CNY"),("investors","投资方"),("use_of_funds_original","资金用途"),("source_title","原始新闻标题"),("source_url","来源URL"),("evidence_grade","证据等级"),("review_status","核验状态")]),
         "并购事件明细": matrix(acquisitions,[("acquisition_id","acquisition_id"),("disclosure_date","披露日期"),("transaction_date","交易日期"),("buyer_name_original","收购方"),("target_name_original","被收购方"),("transaction_type","交易类型"),("transaction_status","交易状态"),("amount_original","交易金额原文"),("normalized_amount_cny","统一金额CNY"),("primary_category","一级产业方向"),("secondary_track","二级赛道"),("rationale_original","交易依据"),("source_title","原始新闻标题"),("source_url","来源URL"),("evidence_grade","证据等级"),("verification_status","核验状态")]),
@@ -53,7 +64,7 @@ def main() -> None:
         "数据来源与核验记录": matrix(sources,[("document_id","document_id"),("title","原始网页标题"),("source_name","来源名称"),("original_url","来源URL"),("published_at","发布日期"),("fetched_at","采集时间"),("evidence_default_grade","证据等级"),("fetch_status","访问状态"),("financing_category","交易类别"),("review_status","核验状态")]),
         "月度统计": stats,
     }
-    payload = {"title":"2026年11月中国科技产业早期融资与并购样本库 V1.0","cutoff":"2026-11-25","coverage_complete":False,"sheets":sheets}
+    payload = {"title":"2026年11月中国科技产业早期融资与并购样本库 V1.1","cutoff":"2026-11-25","coverage_complete":False,"sheets":sheets}
     (ROOT/"work"/"november_workbook_data.json").write_text(json.dumps(payload,ensure_ascii=False),encoding="utf-8")
     print(json.dumps({name:len(data)-1 for name,data in sheets.items()},ensure_ascii=False))
 
