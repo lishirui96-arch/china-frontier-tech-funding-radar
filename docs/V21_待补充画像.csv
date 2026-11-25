@@ -1,0 +1,22 @@
+﻿profile_id,was_pending,was_other,suggested_disposition,suggested_industry,suggested_field,suggested_topic,evidence_assessment,missing_fields,rationale,review_status,company_name,primary_business,core_products,core_technologies,application_scenarios,value_chain_position
+a2ebd02b-4f30-5a3c-934f-a33589144d2c,1,0,unable_to_determine,,,,待补充,core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,北辰航天, 高信资本等机构投资,待补充,待补充,依据现有正文待进一步细化,测运控、地面系统、深空与商业航天任务保障
+8fa48bbd-92f7-5b01-8957-d581c00f1f87,1,1,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies、value_chain_position,现有材料不足，不修改V2.0画像,pending,原力无限INFIFORCE,待补充,待补充,待补充,依据现有正文待进一步细化,待补充
+1273afe3-d924-5f50-98e2-b1b370acae8e,1,0,existing_or_split,新能源与新材料,高性能功能材料,高性能功能材料的国产化与工程验证,待补充,core_products、core_technologies,仅提出建议；不修改V2.0画像,pending,国科炭美,加速打通「材料—器件」一体化生态布局,待补充,待补充,依据现有正文待进一步细化,关键材料性能、工艺放大、认证和长期工况验证
+4d0b32e8-9bcc-5c41-a7ed-eb35aa8cceff,1,0,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,天云创鸿,待补充,待补充,待补充,依据现有正文待进一步细化,企业流程、工业知识和智能体的可交付、可治理应用
+326e3d39-6c99-5b2f-ae46-cdaf8858486b,1,0,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,天链测控,待补充,待补充,待补充,依据现有正文待进一步细化,测运控、地面系统、深空与商业航天任务保障
+541f28c9-9328-5b6a-9dbf-7691dba6fd59,1,1,can_form_new_topic,生物制造与生命科学,数字健康与医疗器械,数字健康与医疗器械,待补充,core_products、core_technologies、value_chain_position,仅提出建议；不修改V2.0画像,pending,广荣科技,聚焦中老年认知健康与心脑慢病全周期管理,待补充,待补充,依据现有正文待进一步细化,待补充
+1f9c580e-d2f7-5f89-94b5-3589f229bb20,1,0,existing_or_new,低空经济,无人机与低空交通,长航时无人机与低空运力服务,待补充,core_products、core_technologies,仅提出建议；不修改V2.0画像,pending,排云智航, 加速长航时无人机产业化,待补充,待补充,依据现有正文待进一步细化,长航时飞行器、eVTOL交易和低空运力运营
+745e4f47-c026-5aaa-8d7f-94733cd8de11,1,1,unable_to_determine,,,,待补充,core_products、core_technologies、value_chain_position,现有材料不足，不修改V2.0画像,pending,津工能源,湘国投领投,待补充,待补充,依据现有正文待进一步细化,待补充
+6f9e0c0e-37e3-5a07-b356-99ca9325b21d,1,0,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,深圳华盛技术,待补充,待补充,待补充,依据现有正文待进一步细化,关节模组、精密传动、伺服驱动和热/功率密度工程
+8bfae241-7c1d-5d12-bd45-f520c2807425,1,0,existing_or_split,新能源与新材料,高性能功能材料,高性能功能材料的国产化与工程验证,待补充,core_products、core_technologies,仅提出建议；不修改V2.0画像,pending,湃沃斯科技,上虞国投、紫竹科投联合投资,待补充,待补充,依据现有正文待进一步细化,材料配方、成型装备和批量一致性交付
+603db8dd-2c69-5273-9e19-1365e82cc2b0,1,0,unable_to_determine,,,,待补充,core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,瑞启深空,天使+轮超亿元,待补充,待补充,依据现有正文待进一步细化,测运控、地面系统、深空与商业航天任务保障
+53ee53b1-613a-5787-a9fc-b75b02c6b3a2,1,0,existing_or_split,新能源与新材料,高性能功能材料,高性能功能材料的国产化与工程验证,待补充,core_products、core_technologies,仅提出建议；不修改V2.0画像,pending,盖科材料,国产有机硅船舶防污涂料走向规模化,待补充,待补充,依据现有正文待进一步细化,关键材料性能、工艺放大、认证和长期工况验证
+dcd814bc-0f4b-5989-8db7-54b29dcf7489,1,1,unable_to_determine,,,,待补充,core_products、core_technologies、value_chain_position,现有材料不足，不修改V2.0画像,pending,知驿科技,清华00后博士生带队创业,待补充,待补充,依据现有正文待进一步细化,待补充
+940f84b5-b1bf-5a9b-80c5-87f5b20ab0aa,1,1,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies、value_chain_position,现有材料不足，不修改V2.0画像,pending,自然选择,待补充,待补充,待补充,依据现有正文待进一步细化,待补充
+06dbc38d-414e-5560-86f7-6e8d6b755e0a,1,0,unable_to_determine,,,,待补充,core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,致真精密仪器,北京航空航天大学孵化,待补充,待补充,依据现有正文待进一步细化,测运控、地面系统、深空与商业航天任务保障
+83b9587f-24ee-5ab6-8753-7fb521d1c2f1,1,0,unable_to_determine,,,,待补充,core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,谱思科技,晨晖创投独家投资,待补充,待补充,依据现有正文待进一步细化,侵入式、微创或睡眠脑机接口及神经康复应用
+de295096-0324-5b01-8d40-3db32007c394,1,0,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies,现有材料不足，不修改V2.0画像,pending,谱星航天,待补充,待补充,待补充,依据现有正文待进一步细化,卫星载荷、光谱定量遥感与数据应用
+86e4c334-1d65-54a1-97ca-4a11046636bd,1,1,unable_to_determine,,,,待补充,primary_business、core_products、core_technologies、value_chain_position,现有材料不足，不修改V2.0画像,pending,超球面科技,待补充,待补充,待补充,依据现有正文待进一步细化,待补充
+9972bccd-ddaf-51b9-9b2e-3530622c8d15,1,0,existing_or_split,新能源与新材料,高性能功能材料,高性能功能材料的国产化与工程验证,待补充,core_products、core_technologies,仅提出建议；不修改V2.0画像,pending,辰达新材,加码高性能磁材制造与磁应用,待补充,待补充,依据现有正文待进一步细化,关键材料性能、工艺放大、认证和长期工况验证
+74563c96-e56c-5644-a2c6-d29f71dfb163,1,1,can_form_new_topic,高端装备与先进制造,半导体装备与先进封装,半导体装备与工艺支撑,待补充,core_products、core_technologies、value_chain_position,仅提出建议；不修改V2.0画像,pending,邦芯半导体,江夏科投领投,待补充,待补充,依据现有正文待进一步细化,待补充
+6ee69226-b884-5b8f-9223-5bfe10af013e,1,0,existing_or_new,低空经济,无人机与低空交通,长航时无人机与低空运力服务,待补充,primary_business、core_products、core_technologies,仅提出建议；不修改V2.0画像,pending,零界航空,待补充,待补充,待补充,依据现有正文待进一步细化,长航时飞行器、eVTOL交易和低空运力运营

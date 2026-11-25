@@ -1,0 +1,9 @@
+﻿proposal_id,level,current_parent,current_name,suggested_parent,suggested_name,proposal_type,rationale,review_status
+6212bb75-4080-5e56-acdc-bd3da077d07b,field,高端装备与先进制造/智能制造装备,智能制造装备,,半导体装备与先进封装,add,现有其他方向中存在晶圆键合、TGV、PVD、刻蚀和检测设备集群。,pending
+421e67a7-c091-5c51-b12c-e722e5accdb2,field,其他新兴技术/数字健康与消费科技,数字健康与消费科技,,数字健康与医疗器械,rename,区分医疗器械、数字健康与一般消费科技。,pending
+f530f4ee-fb90-564b-b170-83750577b655,industry,AI芯片与先进计算,AI芯片与先进计算,,AI软件与工业智能,add,承接企业智能体、工业AI和持续学习软件主题。,pending
+c101bec7-98aa-5a80-ae34-f1a7c18728be,industry,机器人与具身智能,机器人与具身智能,,脑科学与神经技术,add,承接脑机接口、神经信号采集和神经功能重建。,pending
+6ebfb135-af2a-5804-a328-b59e2fbcb44f,industry,机器人与具身智能,机器人与具身智能,,机器人与具身智能,retain,保留机器人本体、感知和核心执行部件；脑机接口另行提议。,pending
+5a0f5a40-edb7-5d68-a87d-836aa726cef0,industry,AI芯片与先进计算,AI芯片与先进计算,,AI芯片与先进计算,retain,限定芯片、计算架构、互连和算力基础设施。,pending
+4c1daeab-e094-57cd-a942-36bcace49f24,industry,商业航天与低空经济,商业航天与低空经济,,商业航天,split,航天器、卫星、测运控与发射任务独立导航。,pending
+0600c082-d932-5400-bd1d-ac5a6cf82c6f,industry,商业航天与低空经济,商业航天与低空经济,,低空经济,split,无人机、eVTOL和低空运营独立导航。,pending
