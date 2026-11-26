@@ -126,7 +126,6 @@ def event_table(data: dict, filters: PublicFilters) -> str:
 
 
 def v30_classified_rows(events: list[dict], taxonomy: dict[str, list[dict]]) -> str:
-    topic_names = {item["topic_id"]: item["name"] for item in taxonomy["topics"]}
     field_names = {item["field_id"]: item["name"] for item in taxonomy["fields"]}
     industry_names = {item["industry_id"]: item["name"] for item in taxonomy["industries"]}
     classified = [event for event in events if event["classification"].get("primary_topic_id")]
@@ -135,12 +134,8 @@ def v30_classified_rows(events: list[dict], taxonomy: dict[str, list[dict]]) -> 
     rows = []
     for event in sorted(classified, key=lambda item: (item.get("disclosure_date", ""), item.get("company_name_standard", "")), reverse=True):
         classification = event["classification"]
-        track = (
-            topic_names.get(classification.get("primary_topic_id"))
-            or field_names.get(classification.get("primary_field_id"))
-            or industry_names.get(classification.get("primary_industry_id"))
-            or "待分类"
-        )
+        industry_name = industry_names.get(classification.get("primary_industry_id")) or "一级领域待补充"
+        field_name = field_names.get(classification.get("primary_field_id")) or "二级领域待补充"
         business = event.get("primary_business") or "主营业务待补充"
         company_name = esc(event.get("company_name_standard") or event.get("company_name_original") or "未命名企业")
         company_id = event.get("company_id")
@@ -160,7 +155,7 @@ def v30_classified_rows(events: list[dict], taxonomy: dict[str, list[dict]]) -> 
         rows.append(
             f'<tr><td>{esc(event["disclosure_date"])}</td>'
             f'<td class="company-cell">{company}<small>{esc(business)}</small></td>'
-            f'<td><span class="track-tag">{esc(track)}</span></td>'
+            f'<td class="track-cell"><strong>{esc(industry_name)}</strong><small>{esc(field_name)}</small></td>'
             f'<td>{esc(event.get("round_original") or "未披露")}</td>'
             f'<td>{esc(event.get("amount_original") or "未披露")}</td>'
             f'<td>{esc(investors)}</td><td>{source}</td></tr>'
