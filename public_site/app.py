@@ -11,7 +11,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 from starlette.staticfiles import StaticFiles
 
-from funding_radar.public_service import PublicDataService, PublicFilters
+from funding_radar.public_service import PublicDataService, PublicFilters, candidate_round_bucket
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -216,7 +216,7 @@ def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries
         selected = " selected" if index == 0 else ""
         round_rows.append(f'<li><button type="button" class="round-selector{selected}" data-round-key="{esc(row["key"])}" aria-selected="{str(index == 0).lower()}" onclick="selectRoundIndustry(\'{esc(row["key"])}\',this)"><i style="background:{color}"></i><span>{esc(row["label"])}</span><b>{row["count"]}</b><em>{row["share"]:.1%}</em></button></li>')
         industry_max = max((item["event_count"] for item in row["industries"]), default=0)
-        industry_bars = "".join(f'<div class="round-industry-row"><span>{esc(item["industry_name"])}</span><i><u style="width:{(item["event_count"] / industry_max * 100) if industry_max else 0:.1f}%"></u></i><b>{item["event_count"]} 起</b><em>{item["share"]:.1%}</em></div>' for item in row["industries"])
+        industry_bars = "".join(f'<a class="round-industry-row" href="/events?industry_id={esc(item["industry_id"])}&amp;round_group={esc(row["key"])}" title="查看{esc(row["label"])} · {esc(item["industry_name"])}融资事件"><span>{esc(item["industry_name"])}</span><i><u style="width:{(item["event_count"] / industry_max * 100) if industry_max else 0:.1f}%"></u></i><b>{item["event_count"]} 起</b><em>{item["share"]:.1%}</em></a>' for item in row["industries"])
         empty = empty_state("暂无该轮次候选事件", "当前95个有效候选事件中没有这一轮次分组。") if not industry_bars else ""
         distribution_views.append(f'''<div class="round-industry-view" data-round-view="{esc(row["key"])}" {"" if index == 0 else "hidden"}><h3>{esc(row["label"])} 产业领域分布</h3><div class="round-summary"><div><i data-lucide="layers-3"></i><span>融资事件数<b>{row["count"]} 起</b></span></div><div><i data-lucide="building-2"></i><span>涉及企业<b>{row["company_count"]} 家</b></span></div><div><i data-lucide="network"></i><span>覆盖领域<b>{row["industry_count"]} 个</b></span></div><div><i data-lucide="pie-chart"></i><span>占全部候选样本<b>{row["share"]:.1%}</b></span></div></div><div class="round-industry-head"><span>产业领域（一级）</span><b>融资事件数</b><em>占比</em></div><div class="round-industry-bars">{industry_bars or empty}</div></div>''')
     donut_background = f'conic-gradient({",".join(stops)})' if stops else '#e4ebf4'
@@ -364,11 +364,15 @@ async def events(request: Request):
     if overview:
         taxonomy=service.v30_taxonomy()
         industry_id=request.query_params.get("industry_id","")
-        rows=[event for event in overview["events"] if not industry_id or event["classification"].get("primary_industry_id")==industry_id]
+        round_group=request.query_params.get("round_group","")
+        valid_round_groups={"vc":"VC（Pre-A–B++）","early":"早期（种子/天使）","strategic":"战略投资 / 并购","other":"其他"}
+        if round_group not in valid_round_groups: round_group=""
+        rows=[event for event in overview["events"] if (not industry_id or event["classification"].get("primary_industry_id")==industry_id) and (not round_group or candidate_round_bucket(event.get("round_original"))==round_group)]
         classified=sum(event["classification"].get("primary_industry_id") is not None for event in rows)
         industry=next((x for x in taxonomy["industries"] if x["industry_id"]==industry_id),None)
         label=f' · {industry["name"]}' if industry else ""
-        return page("融资事件",f'<div class="page-shell subpage"><span class="kicker">FUNDING RECORDS</span><h1>融资事件{esc(label)}</h1><p class="lede">共{len(rows)}条，其中{classified}条已归入一级分类；企业下方展示主营业务画像。</p><section class="panel event-detail">{v30_classified_rows(rows,taxonomy)}</section></div>',"/events")
+        round_label=f' · {valid_round_groups[round_group]}' if round_group else ""
+        return page("融资事件",f'<div class="page-shell subpage"><a class="back" href="/">← 返回首页资本流向</a><span class="kicker">FUNDING RECORDS</span><h1>融资事件{esc(label)}{esc(round_label)}</h1><p class="lede">共{len(rows)}条，其中{classified}条已归入一级分类；企业下方展示主营业务画像。</p><section class="panel event-detail">{v30_classified_rows(rows,taxonomy)}</section></div>',"/events")
     return listing("融资事件","VERIFIED EVENTS","文档数与唯一融资事件数严格分离。","暂无已发布融资事件","/events")
 async def event_detail(request: Request):
     event=service.event(request.path_params["event_id"])

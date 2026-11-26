@@ -99,6 +99,7 @@ def test_public_api_and_home_show_real_empty_state():
     assert "近6个月融资趋势" not in home
     assert "VC（Pre-A–B++） 产业领域分布" in home
     assert "占全部候选样本" in home
+    assert "round_group=vc" in home and "round_group=early" in home
     repeated = client.get("/companies/repeated")
     assert repeated.status_code == 200
     assert "谱星航天" in repeated.text and "已合并重复来源" in repeated.text

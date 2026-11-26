@@ -39,6 +39,14 @@ try {
     const earlyView = page.locator('[data-round-view="early"]');
     if (!(await earlyView.isVisible()) || !(await earlyView.innerText()).includes("29 起")) throw new Error(`round industry interaction failed: ${config.name}`);
     await page.locator('[data-round-key="vc"]').click();
+    const vcIndustryHref = await page.locator('[data-round-view="vc"] .round-industry-row').first().getAttribute('href');
+    if (!vcIndustryHref?.includes("round_group=vc")) throw new Error(`round industry event link failed: ${config.name}`);
+    await page.goto(`http://127.0.0.1:8511${vcIndustryHref}`, { waitUntil: "networkidle" });
+    const filteredText = await page.locator("body").innerText();
+    if (!filteredText.includes("融资事件 · 生物制造与生命科学 · VC（Pre-A–B++）") || !filteredText.includes("共15条")) throw new Error(`round industry event filtering failed: ${config.name}`);
+    if (!(await page.locator(".company-cell small").first().isVisible())) throw new Error(`filtered event company profile missing: ${config.name}`);
+    await page.screenshot({ path: path.join(out, `8511_round_industry_events_${config.name}.png`), fullPage: true });
+    await page.goto("http://127.0.0.1:8511", { waitUntil: "networkidle" });
     const repeatedHref = await page.locator('.capital-metrics a[href="/companies/repeated"]').getAttribute('href');
     if (repeatedHref !== "/companies/repeated") throw new Error(`repeated company metric link failed: ${config.name}`);
     await page.goto(`http://127.0.0.1:8511${repeatedHref}`, { waitUntil: "networkidle" });

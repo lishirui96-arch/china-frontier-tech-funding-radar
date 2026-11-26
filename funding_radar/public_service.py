@@ -171,6 +171,17 @@ def aggregate_monthly_capital_flow(
     }
 
 
+def candidate_round_bucket(value: object) -> str:
+    normalized = str(value or "").strip().casefold()
+    if any(token in normalized for token in ("seed", "angel", "种子", "天使")):
+        return "early"
+    if any(token in normalized for token in ("战略", "并购", "收购", "strategic")):
+        return "strategic"
+    if re.search(r"(?:pre[- ]?[ab]|[ab](?:\+{1,2}|\d)?)(?:轮)?", normalized):
+        return "vc"
+    return "other"
+
+
 def candidate_round_structure(events: list[dict[str, Any]], industries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     groups = [
         {"key": "vc", "label": "VC（Pre-A–B++）", "count": 0},
@@ -186,15 +197,7 @@ def candidate_round_structure(events: list[dict[str, Any]], industries: list[dic
         if key and key not in unique:
             unique[key] = event
     for event in unique.values():
-        value = str(event.get("round_original") or "").strip().casefold()
-        if any(token in value for token in ("seed", "angel", "种子", "天使")):
-            bucket = "early"
-        elif any(token in value for token in ("战略", "并购", "收购", "strategic")):
-            bucket = "strategic"
-        elif re.search(r"(?:pre[- ]?[ab]|[ab](?:\+{1,2}|\d)?)(?:轮)?", value):
-            bucket = "vc"
-        else:
-            bucket = "other"
+        bucket = candidate_round_bucket(event.get("round_original"))
         lookup[bucket]["count"] += 1
         grouped_events[bucket].append(event)
     total = len(unique)
