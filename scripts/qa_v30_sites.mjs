@@ -30,6 +30,8 @@ try {
     await page.screenshot({ path: path.join(out, `8511_home_${config.name}.png`), fullPage: true });
     const text = await page.locator("body").innerText();
     if (!text.includes("10个产业方向") || !text.includes("42个技术领域") || !text.includes("51个候选主题") || !text.includes("22 / 79 / 18") || !text.includes("97 / 0") || !text.includes("共97条")) throw new Error(`V3.2 home assertions failed: ${config.name}`);
+    if (!text.includes("本月暂无人工确认的正式融资事件") || !text.includes("资本流向：资金由市场流入各产业领域")) throw new Error(`monthly capital flow empty state failed: ${config.name}`);
+    if (await page.locator("#monthly-capital-flow .empty-industry-links a").count() !== 10) throw new Error(`monthly industry links failed: ${config.name}`);
     const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     if (homeOverflow) throw new Error(`home horizontal overflow: ${config.name}`);
     const homeHeaders = await page.locator(".classified-table thead th").allTextContents();
@@ -61,6 +63,7 @@ try {
   await page.goto("http://127.0.0.1:8510", { waitUntil: "networkidle" });
   const body = await page.locator("body").innerText();
   if (!body.includes("V3.0分类与历史迁移")) throw new Error("8510 navigation does not expose V3.0 page");
+  if (!body.includes("本月资本流向预览")) throw new Error("8510 navigation does not expose monthly capital preview");
   await page.screenshot({ path: path.join(out, "8510_home_desktop.png"), fullPage: true });
   results.push({ site: 8510, viewport: "desktop", navigationVisible: true });
   await page.close();

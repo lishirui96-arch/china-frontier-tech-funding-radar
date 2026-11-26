@@ -13,6 +13,7 @@ from funding_radar.db import connect
 
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 DATE_ONLY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+MONTH_ONLY = re.compile(r"^(\d{4})-(\d{2})$")
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,99 @@ def primary_track(event: dict[str, Any]) -> tuple[str, str]:
         item = tracks[0]
         return str(item.get("track_id") or item.get("name")), str(item.get("track_name") or item.get("name"))
     return "unclassified", "未分类"
+
+
+def recent_months(month: str, count: int = 6) -> list[str]:
+    match = MONTH_ONLY.fullmatch(month)
+    if not match:
+        raise ValueError("month must use YYYY-MM")
+    year, number = int(match.group(1)), int(match.group(2))
+    if not 1 <= number <= 12:
+        raise ValueError("month must use YYYY-MM")
+    values = []
+    for offset in range(count - 1, -1, -1):
+        absolute = year * 12 + number - 1 - offset
+        values.append(f"{absolute // 12:04d}-{absolute % 12 + 1:02d}")
+    return values
+
+
+def aggregate_monthly_capital_flow(
+    events: list[dict[str, Any]], industries: list[dict[str, Any]], month: str, *,
+    currency: str = "", industry_id: str = "", round_name: str = "",
+    updated_at: str | None = None,
+) -> dict[str, Any]:
+    """Aggregate only events already admitted by the strict release/confirmation gate."""
+    months = recent_months(month)
+    unique: dict[str, dict[str, Any]] = {}
+    for raw in events:
+        event_id = str(raw.get("event_id") or raw.get("confirmed_event_id") or "")
+        if not event_id or event_id in unique:
+            continue
+        item = dict(raw)
+        item["event_id"] = event_id
+        item["month"] = china_month(item.get("announcement_date"))
+        if not item["month"]:
+            continue
+        if currency and str(item.get("amount_currency") or "") != currency:
+            continue
+        if industry_id and str(item.get("primary_industry_id") or "") != industry_id:
+            continue
+        if round_name and str(item.get("round_normalized") or "") != round_name:
+            continue
+        unique[event_id] = item
+    selected = list(unique.values())
+    current = [item for item in selected if item["month"] == month]
+
+    def valid_amount(item: dict[str, Any]) -> int | float | None:
+        if item.get("is_cumulative_amount"):
+            return None
+        if item.get("amount_disclosure_type") != "exact":
+            return None
+        value = item.get("amount_exact")
+        return value if isinstance(value, (int, float)) else None
+
+    currencies = sorted({str(x.get("amount_currency")) for x in current if valid_amount(x) is not None and x.get("amount_currency")})
+    trend_currencies = sorted({str(x.get("amount_currency")) for x in selected if x["month"] in months and valid_amount(x) is not None and x.get("amount_currency")})
+    totals = {code: sum(valid_amount(x) or 0 for x in current if x.get("amount_currency") == code) for code in currencies}
+    industry_names = {str(x["industry_id"]): str(x["name"]) for x in industries}
+    industry_rows = []
+    for item in industries:
+        iid = str(item["industry_id"])
+        matches = [x for x in current if x.get("primary_industry_id") == iid]
+        amounts = {code: sum(valid_amount(x) or 0 for x in matches if x.get("amount_currency") == code) for code in currencies}
+        industry_rows.append({
+            "industry_id": iid, "industry_name": str(item["name"]),
+            "event_count": len({x["event_id"] for x in matches}),
+            "company_count": len({x.get("company_id") for x in matches if x.get("company_id")}),
+            "amounts": amounts,
+            "shares": {code: (amounts[code] / totals[code] if totals.get(code) else None) for code in currencies},
+        })
+    round_rows = []
+    for name in sorted({str(x.get("round_normalized") or "未标准化") for x in current}):
+        matches = [x for x in current if str(x.get("round_normalized") or "未标准化") == name]
+        amounts = {code: sum(valid_amount(x) or 0 for x in matches if x.get("amount_currency") == code) for code in currencies}
+        round_rows.append({"round": name, "event_count": len({x["event_id"] for x in matches}), "amounts": amounts,
+                           "shares": {code: (amounts[code] / totals[code] if totals.get(code) else None) for code in currencies}})
+    trend = []
+    for value in months:
+        matches = [x for x in selected if x["month"] == value]
+        trend.append({"month": value, "event_count": len({x["event_id"] for x in matches}),
+                      "amounts": {code: sum(valid_amount(x) or 0 for x in matches if x.get("amount_currency") == code) for code in trend_currencies}})
+    classified = [x for x in current if x.get("primary_industry_id") in industry_names]
+    disclosed = [x for x in current if valid_amount(x) is not None]
+    return {
+        "scope": "formal_confirmed_release_only", "month": month, "is_mtd": month == datetime.now(CHINA_TZ).strftime("%Y-%m"),
+        "filters": {"currency": currency or None, "industry_id": industry_id or None, "round": round_name or None},
+        "totals": {"event_count": len(current), "amount_disclosed_event_count": len(disclosed),
+                   "company_count": len({x.get("company_id") for x in current if x.get("company_id")}),
+                   "industry_count": len({x.get("primary_industry_id") for x in classified}), "amounts": totals,
+                   "amount_disclosure_coverage": len(disclosed) / len(current) if current else 0,
+                   "unclassified_event_count": len(current) - len(classified)},
+        "industries": industry_rows, "rounds": round_rows, "trend": trend,
+        "currencies": currencies, "trend_currencies": trend_currencies, "updated_at": updated_at,
+        "methodology": ["仅统计人工确认且进入正式Release的唯一事件", "按announcement_date公告日期统计", "当前月为MTD口径",
+                        "未披露、累计及非精确区间金额不计入金额汇总", "CNY与USD分币种统计，不直接相加"],
+    }
 
 
 class PublicDataService:
@@ -177,6 +271,88 @@ class PublicDataService:
         return {"company_id": company_id, "name": first["company_name_standard"],
                 "business": first.get("primary_business") or "待补充", "products": first.get("core_products") or "待补充",
                 "technologies": first.get("core_technologies") or "待补充", "events": events}
+
+    def _strict_formal_events(self) -> tuple[list[dict[str, Any]], str | None]:
+        """Intersect explicit V1.5 confirmations with the immutable formal Release.
+
+        The schemas intentionally have no inferred bridge. A Release snapshot must
+        carry confirmed_event_id or review_item_id; ambiguous records are excluded.
+        """
+        release = self.current_release()
+        if not release:
+            return [], None
+        confirmations = {row["confirmed_event_id"]: row for row in self._rows(
+            "SELECT * FROM v15_confirmed_funding_events WHERE is_active=1"
+        )}
+        by_review = {row["review_item_id"]: row for row in confirmations.values()}
+        classifications = {row["review_item_id"]: row for row in self._rows(
+            """SELECT h.review_item_id,c.primary_industry_id,c.primary_field_id,c.primary_topic_id
+               FROM v30_historical_records h
+               JOIN v30_record_classifications c ON c.record_id=h.record_id"""
+        )}
+        admitted: list[dict[str, Any]] = []
+        for snapshot in release.events:
+            confirmed = confirmations.get(str(snapshot.get("confirmed_event_id") or ""))
+            if not confirmed:
+                confirmed = by_review.get(str(snapshot.get("review_item_id") or ""))
+            if not confirmed:
+                continue
+            classification = classifications.get(confirmed["review_item_id"], {})
+            currency = str(snapshot.get("amount_currency") or confirmed.get("amount_currency") or "UNKNOWN")
+            exact = snapshot.get("amount_exact")
+            disclosure = snapshot.get("amount_disclosure_type")
+            if exact is None and currency == "CNY" and confirmed.get("amount_cny") is not None:
+                exact, disclosure = confirmed["amount_cny"], "exact"
+            admitted.append({
+                "event_id": confirmed["confirmed_event_id"], "confirmed_event_id": confirmed["confirmed_event_id"],
+                "review_item_id": confirmed["review_item_id"], "company_id": confirmed["company_id"],
+                "company_name": confirmed["company_name"], "announcement_date": confirmed["disclosure_date"],
+                "round_original": confirmed["round_original"], "round_normalized": confirmed["round_confirmed"],
+                "amount_original": confirmed["amount_original"], "amount_currency": currency,
+                "amount_exact": exact, "amount_disclosure_type": disclosure or "undisclosed",
+                "is_cumulative_amount": bool(snapshot.get("is_cumulative_amount", False)),
+                "primary_industry_id": classification.get("primary_industry_id"),
+                "primary_field_id": classification.get("primary_field_id"),
+                "primary_topic_id": classification.get("primary_topic_id"),
+            })
+        return admitted, release.created_at
+
+    def formal_monthly_capital_flow(self, month: str | None = None, *, currency: str = "", industry_id: str = "", round_name: str = "") -> dict[str, Any]:
+        target = month or datetime.now(CHINA_TZ).strftime("%Y-%m")
+        events, updated_at = self._strict_formal_events()
+        taxonomy = self.v30_taxonomy()
+        return aggregate_monthly_capital_flow(events, taxonomy["industries"], target, currency=currency,
+                                              industry_id=industry_id, round_name=round_name, updated_at=updated_at)
+
+    def formal_released_events(self) -> list[dict[str, Any]]:
+        events, _ = self._strict_formal_events()
+        return events
+
+    def internal_monthly_quality_preview(self) -> dict[str, Any]:
+        confirmed = self._rows("SELECT COUNT(*) n FROM v15_confirmed_funding_events WHERE is_active=1")[0]["n"]
+        formal_events, _ = self._strict_formal_events()
+        historical = self._rows("""SELECT COUNT(*) total,
+          SUM(announcement_date GLOB '????-??-??') dated,
+          SUM(amount_disclosure_type<>'undisclosed' AND is_cumulative_amount=0) valid_amount,
+          SUM(amount_disclosure_type='exact' AND amount_exact IS NOT NULL AND is_cumulative_amount=0) exact_amount,
+          SUM(amount_disclosure_type='undisclosed') undisclosed,
+          SUM(is_cumulative_amount=1) cumulative FROM funding_events""")[0]
+        currencies = self._rows("SELECT amount_currency,COUNT(*) event_count FROM funding_events GROUP BY amount_currency ORDER BY amount_currency")
+        rounds = self._rows("SELECT round_normalized,COUNT(*) event_count FROM funding_events GROUP BY round_normalized ORDER BY event_count DESC,round_normalized")
+        classified = self._rows("""SELECT COUNT(DISTINCT e.event_id) n FROM v22_events e
+          JOIN v22_event_topics et ON et.event_id=e.event_id JOIN v22_topics t ON t.topic_id=et.topic_id
+          JOIN v22_fields f ON f.field_id=t.field_id JOIN v22_industries i ON i.industry_id=f.industry_id
+          WHERE e.event_source_type='formal'""")[0]["n"]
+        candidates = self._rows("SELECT queue_class,COUNT(*) event_count FROM v30_historical_records GROUP BY queue_class ORDER BY queue_class")
+        candidate_industries = self._rows("""SELECT h.queue_class,i.name industry_name,COUNT(DISTINCT h.record_id) event_count
+          FROM v30_historical_records h JOIN v30_record_classifications c ON c.record_id=h.record_id
+          LEFT JOIN v22_industries i ON i.industry_id=c.primary_industry_id
+          GROUP BY h.queue_class,i.name ORDER BY h.queue_class,event_count DESC""")
+        return {"formal": {"confirmed_events": confirmed, "released_events": len(formal_events),
+                           "amount_disclosed_events": sum(1 for x in formal_events if x.get("amount_disclosure_type") == "exact" and not x.get("is_cumulative_amount")),
+                           "classified_events": sum(1 for x in formal_events if x.get("primary_industry_id"))},
+                "historical": {**historical, "classified_events": classified, "currencies": currencies, "rounds": rounds},
+                "candidates": {"counts": candidates, "industries": candidate_industries}}
 
     def overview(self) -> dict[str, Any]:
         release = self.current_release()
