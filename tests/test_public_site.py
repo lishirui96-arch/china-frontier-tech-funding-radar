@@ -85,4 +85,5 @@ def test_candidate_industry_structure_counts_unique_records():
     ]
     result = candidate_industry_structure(events, industries)
     assert result["total"] == 3 and result["classified"] == 3 and result["unclassified"] == 0
+    assert result["company_count"] == 0 and result["industry_count"] == 2
     assert [(row["industry_id"], row["event_count"]) for row in result["industries"]] == [("robot", 2), ("ai", 1)]

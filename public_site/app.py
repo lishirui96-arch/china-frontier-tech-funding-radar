@@ -194,9 +194,9 @@ def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries
     amount_summary = " / ".join(capital_amount(value, code) for code, value in amounts.items()) or "暂无可统计金额"
     cards = "".join((
         metric("本月融资总额", "coins", amount_summary),
-        metric("正式融资事件数", "layers-3", f'{totals["event_count"]} 起'),
-        metric("涉及企业数", "building-2", f'{totals["company_count"]} 家'),
-        metric("覆盖产业领域数", "network", f'{totals["industry_count"]} 个'),
+        metric("候选融资事件数", "layers-3", f'{candidate_industries["total"]} 起'),
+        metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家'),
+        metric("覆盖产业领域数（候选）", "network", f'{candidate_industries["industry_count"]} 个'),
     ))
     ranking_rows = []
     ranking_max = max((row["event_count"] for row in candidate_industries["industries"]), default=0)

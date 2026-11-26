@@ -92,6 +92,9 @@ def test_public_api_and_home_show_real_empty_state():
     assert "区间披露金额事件" in home
     assert "各领域融资事件次数与占比" in home
     assert "/events?industry_id=" in home
+    assert "候选融资事件数" in home and "97 起" in home
+    assert "涉及企业数（候选）" in home and "95 家" in home
+    assert "覆盖产业领域数（候选）" in home and "10 个" in home
     assert home.index("本月资本流向概览") < home.index("产业技术分类导航")
     formal = client.get("/events?scope=formal&industry_id=robot").text
     assert "暂无人工确认的正式融资事件" in formal
