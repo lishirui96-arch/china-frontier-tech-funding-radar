@@ -289,7 +289,9 @@ async def investor_detail(request: Request): return listing("投资机构详情"
 async def events(request: Request):
     overview=service.v30_overview()
     if overview:
-        return page("融资事件",f'<div class="page-shell subpage"><span class="kicker">FUNDING RECORDS</span><h1>融资事件</h1><p class="lede">共{len(overview["events"])}条候选记录；唯一事件与来源记录分别审计，A/B状态明确展示。</p><section class="panel event-detail">{v30_event_rows(overview["events"])}</section></div>',"/events")
+        taxonomy=service.v30_taxonomy()
+        classified=sum(event["classification"].get("primary_industry_id") is not None for event in overview["events"])
+        return page("融资事件",f'<div class="page-shell subpage"><span class="kicker">FUNDING RECORDS</span><h1>融资事件</h1><p class="lede">共{len(overview["events"])}条，其中{classified}条已归入一级分类；企业下方展示主营业务画像。</p><section class="panel event-detail">{v30_classified_rows(overview["events"],taxonomy)}</section></div>',"/events")
     return listing("融资事件","VERIFIED EVENTS","文档数与唯一融资事件数严格分离。","暂无已发布融资事件","/events")
 async def event_detail(request: Request):
     event=service.event(request.path_params["event_id"])

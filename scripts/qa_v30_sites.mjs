@@ -32,6 +32,13 @@ try {
     if (!text.includes("10个产业方向") || !text.includes("42个技术领域") || !text.includes("51个候选主题") || !text.includes("22 / 79 / 18") || !text.includes("97 / 0") || !text.includes("共97条")) throw new Error(`V3.2 home assertions failed: ${config.name}`);
     const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     if (homeOverflow) throw new Error(`home horizontal overflow: ${config.name}`);
+    const homeHeaders = await page.locator(".classified-table thead th").allTextContents();
+    await page.goto("http://127.0.0.1:8511/events", { waitUntil: "networkidle" });
+    const eventHeaders = await page.locator(".classified-table thead th").allTextContents();
+    if (JSON.stringify(eventHeaders) !== JSON.stringify(homeHeaders)) throw new Error(`event headers differ from home: ${config.name}`);
+    if (!(await page.locator(".company-cell small").first().isVisible())) throw new Error(`event company profile missing: ${config.name}`);
+    if (!(await page.locator(".track-cell small").first().isVisible())) throw new Error(`event secondary field missing: ${config.name}`);
+    await page.screenshot({ path: path.join(out, `8511_events_${config.name}.png`), fullPage: true });
     await page.goto("http://127.0.0.1:8511/taxonomy", { waitUntil: "networkidle" });
     if (await page.locator(".field-card").count() !== 10) throw new Error(`taxonomy card count failed: ${config.name}`);
     const firstIndustry = await page.locator(".field-card").first().getAttribute("href");
