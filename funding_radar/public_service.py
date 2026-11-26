@@ -206,6 +206,28 @@ def candidate_round_structure(events: list[dict[str, Any]]) -> dict[str, Any]:
             "note": "VC口径包含Pre-A、A、A+、A++、Pre-B、B、B+、B++等成长阶段融资"}
 
 
+def candidate_industry_structure(events: list[dict[str, Any]], industries: list[dict[str, Any]]) -> dict[str, Any]:
+    unique: dict[str, dict[str, Any]] = {}
+    for event in events:
+        key = str(event.get("record_id") or event.get("unique_event_id") or "")
+        if key and key not in unique:
+            unique[key] = event
+    counts: dict[str, int] = {}
+    for event in unique.values():
+        industry_id = str((event.get("classification") or {}).get("primary_industry_id") or "")
+        if industry_id:
+            counts[industry_id] = counts.get(industry_id, 0) + 1
+    total = len(unique)
+    rows = [{"industry_id": row["industry_id"], "industry_name": row["name"],
+             "event_count": counts.get(row["industry_id"], 0),
+             "share": counts.get(row["industry_id"], 0) / total if total else 0}
+            for row in industries]
+    rows.sort(key=lambda row: (-row["event_count"], row["industry_name"]))
+    return {"scope": "A_B_candidate_observation", "total": total, "industries": rows,
+            "classified": sum(row["event_count"] for row in rows),
+            "unclassified": total - sum(row["event_count"] for row in rows)}
+
+
 class PublicDataService:
     """Read-only facade over immutable, currently published release snapshots."""
 
@@ -372,6 +394,11 @@ class PublicDataService:
     def v30_candidate_round_structure(self) -> dict[str, Any]:
         overview = self.v30_overview()
         return candidate_round_structure((overview or {}).get("events", []))
+
+    def v30_candidate_industry_structure(self) -> dict[str, Any]:
+        overview = self.v30_overview()
+        taxonomy = self.v30_taxonomy()
+        return candidate_industry_structure((overview or {}).get("events", []), taxonomy["industries"])
 
     def internal_monthly_quality_preview(self) -> dict[str, Any]:
         confirmed = self._rows("SELECT COUNT(*) n FROM v15_confirmed_funding_events WHERE is_active=1")[0]["n"]

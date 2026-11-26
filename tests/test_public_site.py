@@ -3,7 +3,7 @@ from __future__ import annotations
 from starlette.testclient import TestClient
 
 from funding_radar.db import connect
-from funding_radar.public_service import PublicDataService, candidate_round_structure
+from funding_radar.public_service import PublicDataService, candidate_industry_structure, candidate_round_structure
 from funding_radar.review_service import change_release_status
 from funding_radar.services import create_release
 from tests.conftest import add_company, add_document, add_event, add_required_evidence
@@ -73,3 +73,16 @@ def test_candidate_round_structure_groups_and_deduplicates():
     assert result["total"] == 5
     assert [group["count"] for group in result["groups"]] == [2, 2, 1, 0]
     assert result["queue_counts"] == {"A": 3, "B": 2}
+
+
+def test_candidate_industry_structure_counts_unique_records():
+    industries = [{"industry_id": "robot", "name": "机器人"}, {"industry_id": "ai", "name": "AI计算"}]
+    events = [
+        {"record_id": "1", "classification": {"primary_industry_id": "robot"}},
+        {"record_id": "1", "classification": {"primary_industry_id": "robot"}},
+        {"record_id": "2", "classification": {"primary_industry_id": "robot"}},
+        {"record_id": "3", "classification": {"primary_industry_id": "ai"}},
+    ]
+    result = candidate_industry_structure(events, industries)
+    assert result["total"] == 3 and result["classified"] == 3 and result["unclassified"] == 0
+    assert [(row["industry_id"], row["event_count"]) for row in result["industries"]] == [("robot", 2), ("ai", 1)]
