@@ -29,7 +29,8 @@ try {
     await page.goto("http://127.0.0.1:8511", { waitUntil: "networkidle" });
     await page.screenshot({ path: path.join(out, `8511_home_${config.name}.png`), fullPage: true });
     const text = await page.locator("body").innerText();
-    if (!text.includes("10个产业方向") || !text.includes("42个技术领域") || !text.includes("51个候选主题") || !text.includes("22 / 79 / 18") || !text.includes("97 / 0") || !text.includes("共97条")) throw new Error(`V3.2 home assertions failed: ${config.name}`);
+    if (!text.includes("10个产业方向") || !text.includes("42个技术领域") || !text.includes("51个候选主题") || !text.includes("97 / 0") || !text.includes("共97条")) throw new Error(`V3.2 home assertions failed: ${config.name}`);
+    if (text.includes("正式/A/B")) throw new Error(`legacy formal candidate metric still visible: ${config.name}`);
     if (!text.includes("本月暂无人工确认的正式融资事件") || !text.includes("资本流向：资金由市场流入各产业领域")) throw new Error(`monthly capital flow empty state failed: ${config.name}`);
     if (await page.locator("#monthly-capital-flow .empty-industry-links a").count() !== 10) throw new Error(`monthly industry links failed: ${config.name}`);
     const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
