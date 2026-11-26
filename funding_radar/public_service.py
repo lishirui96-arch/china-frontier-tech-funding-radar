@@ -305,7 +305,7 @@ class PublicDataService:
         rows = self._rows("SELECT * FROM v30_releases WHERE status='published' ORDER BY created_at DESC LIMIT 1")
         return rows[0] if rows else None
 
-    def v30_overview(self) -> dict[str, Any] | None:
+    def v30_overview(self, *, include_duplicate_sources: bool = False) -> dict[str, Any] | None:
         release = self.v30_release()
         if not release: return None
         manifest = json.loads(release["manifest_json"])
@@ -315,6 +315,25 @@ class PublicDataService:
             event = json.loads(row["event_snapshot_json"])
             event["classification"] = json.loads(row["classification_snapshot_json"])
             events.append(event)
+        if not include_duplicate_sources:
+            merges = self._rows("SELECT * FROM v34_candidate_source_merges WHERE decision_status='confirmed'")
+            duplicate_ids = {row["duplicate_record_id"] for row in merges}
+            canonical = {row["canonical_record_id"]: row for row in merges}
+            events = [event for event in events if event.get("record_id") not in duplicate_ids]
+            for event in events:
+                decision = canonical.get(event.get("record_id"))
+                if decision:
+                    event["round_original"] = decision["canonical_round"]
+                    event["source_merge_status"] = "confirmed"
+                    event["merged_duplicate_record_id"] = decision["duplicate_record_id"]
+            manifest = dict(manifest)
+            manifest["historical_source_records"] = manifest.get("source_records", len(records))
+            manifest["source_records"] = len(events)
+            manifest["unique_candidate_events"] = len(events)
+            manifest["classified"] = sum(event["classification"].get("primary_industry_id") is not None for event in events)
+            manifest["pending_classification"] = len(events) - manifest["classified"]
+            manifest["a_candidates"] = sum(event.get("queue_class") == "A" for event in events)
+            manifest["b_candidates"] = sum(event.get("queue_class") == "B" for event in events)
         return {"release": release, "manifest": manifest, "events": events}
 
     def v30_taxonomy(self) -> dict[str, list[dict[str, Any]]]:
@@ -437,6 +456,21 @@ class PublicDataService:
         overview = self.v30_overview()
         return repeated_candidate_companies((overview or {}).get("events", []))
 
+    def v34_merged_candidate_sources(self) -> list[dict[str, Any]]:
+        overview = self.v30_overview(include_duplicate_sources=True)
+        by_record = {event.get("record_id"): event for event in (overview or {}).get("events", [])}
+        results = []
+        for decision in self._rows("SELECT * FROM v34_candidate_source_merges WHERE decision_status='confirmed' ORDER BY decided_at,merge_id"):
+            canonical = by_record.get(decision["canonical_record_id"])
+            duplicate = by_record.get(decision["duplicate_record_id"])
+            if not canonical or not duplicate:
+                continue
+            canonical = dict(canonical)
+            canonical["round_original"] = decision["canonical_round"]
+            results.append({**decision, "company_name": canonical.get("company_name_standard") or "未命名企业",
+                            "records": [canonical, duplicate]})
+        return results
+
     def internal_monthly_quality_preview(self) -> dict[str, Any]:
         confirmed = self._rows("SELECT COUNT(*) n FROM v15_confirmed_funding_events WHERE is_active=1")[0]["n"]
         formal_events, _ = self._strict_formal_events()
@@ -452,16 +486,26 @@ class PublicDataService:
           JOIN v22_event_topics et ON et.event_id=e.event_id JOIN v22_topics t ON t.topic_id=et.topic_id
           JOIN v22_fields f ON f.field_id=t.field_id JOIN v22_industries i ON i.industry_id=f.industry_id
           WHERE e.event_source_type='formal'""")[0]["n"]
-        candidates = self._rows("SELECT queue_class,COUNT(*) event_count FROM v30_historical_records GROUP BY queue_class ORDER BY queue_class")
-        candidate_industries = self._rows("""SELECT h.queue_class,i.name industry_name,COUNT(DISTINCT h.record_id) event_count
-          FROM v30_historical_records h JOIN v30_record_classifications c ON c.record_id=h.record_id
-          LEFT JOIN v22_industries i ON i.industry_id=c.primary_industry_id
-          GROUP BY h.queue_class,i.name ORDER BY h.queue_class,event_count DESC""")
+        raw_candidates = self._rows("SELECT queue_class,COUNT(*) event_count FROM v30_historical_records GROUP BY queue_class ORDER BY queue_class")
+        candidate_overview = self.v30_overview()
+        candidate_events = (candidate_overview or {}).get("events", [])
+        candidate_counts = [{"queue_class": queue, "event_count": sum(event.get("queue_class") == queue for event in candidate_events)}
+                            for queue in ("A", "B")]
+        industry_names = {row["industry_id"]: row["name"] for row in self.v30_taxonomy()["industries"]}
+        distribution: dict[tuple[str, str], int] = {}
+        for event in candidate_events:
+            key = (str(event.get("queue_class") or ""), industry_names.get(event["classification"].get("primary_industry_id"), "待分类"))
+            distribution[key] = distribution.get(key, 0) + 1
+        candidate_industries = [{"queue_class": key[0], "industry_name": key[1], "event_count": count}
+                                for key, count in sorted(distribution.items(), key=lambda item: (item[0][0], -item[1], item[0][1]))]
+        merge_count = self._rows("SELECT COUNT(*) n FROM v34_candidate_source_merges WHERE decision_status='confirmed'")[0]["n"]
         return {"formal": {"confirmed_events": confirmed, "released_events": len(formal_events),
                            "amount_disclosed_events": sum(1 for x in formal_events if x.get("amount_disclosure_type") == "exact" and not x.get("is_cumulative_amount")),
                            "classified_events": sum(1 for x in formal_events if x.get("primary_industry_id"))},
                 "historical": {**historical, "classified_events": classified, "currencies": currencies, "rounds": rounds},
-                "candidates": {"counts": candidates, "industries": candidate_industries}}
+                "candidates": {"counts": candidate_counts, "industries": candidate_industries,
+                               "raw_counts": raw_candidates, "raw_source_records": sum(row["event_count"] for row in raw_candidates),
+                               "effective_events": len(candidate_events), "merged_duplicate_sources": merge_count}}
 
     def overview(self) -> dict[str, Any]:
         release = self.current_release()

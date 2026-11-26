@@ -40,5 +40,5 @@ counts = {row["queue_class"]: row["event_count"] for row in data["candidates"]["
 left, right = st.columns(2)
 left.metric("A类候选", counts.get("A", 0))
 right.metric("B类候选", counts.get("B", 0))
-st.caption("以下分类分布只用于候选观察，不进入公开正式资本流向。")
+st.caption(f"有效候选事件{data['candidates']['effective_events']}条；原始来源记录{data['candidates']['raw_source_records']}条，其中已合并重复来源{data['candidates']['merged_duplicate_sources']}条。以下分类分布不进入公开正式资本流向。")
 st.dataframe(pd.DataFrame(data["candidates"]["industries"]), hide_index=True, width="stretch")

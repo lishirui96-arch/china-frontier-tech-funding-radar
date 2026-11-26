@@ -224,7 +224,7 @@ def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries
     donut_background = f'conic-gradient({",".join(stops)})' if stops else '#e4ebf4'
     ring = f'<div class="candidate-donut" style="--donut:{donut_background}"><span><b>{candidate_rounds["total"]}起</b><small>候选融资数量</small></span></div><div class="candidate-round-table"><div class="candidate-round-head"><span>轮次</span><b>数量</b><em>占比</em></div><ul class="round-list">{"".join(round_rows)}</ul></div><p class="candidate-scope-note">A类{candidate_rounds["queue_counts"].get("A",0)}条 · B类{candidate_rounds["queue_counts"].get("B",0)}条候选观察样本<br>{esc(candidate_rounds["note"])}</p>'
     mtd = "MTD · 月内累计" if data["is_mtd"] else "自然月统计"
-    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">MONTHLY CAPITAL FLOW</span><h2>本月资本流向概览 <small>（{esc(month_label)}）</small></h2></div></div><p>按公告日期统计 · {mtd} · CNY与USD分币种展示</p></div><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本月暂无人工确认的正式融资事件" if totals["event_count"] == 0 else "仅统计人工确认且进入正式Release的融资事件")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资事件次数与占比 <small>97条候选观察样本</small></h3><div class="ranking-list candidate-industry-ranking">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-trend"><h3>近6个月融资趋势</h3><p>柱：已披露精确金额　点上数字：正式事件数</p><div class="capital-trend-chart">{trend}</div></article><article class="capital-panel capital-structure"><h3>本月资金结构（按轮次） <small>97条候选观察样本</small></h3>{ring}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></section>'''
+    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">MONTHLY CAPITAL FLOW</span><h2>本月资本流向概览 <small>（{esc(month_label)}）</small></h2></div></div><p>按公告日期统计 · {mtd} · CNY与USD分币种展示</p></div><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本月暂无人工确认的正式融资事件" if totals["event_count"] == 0 else "仅统计人工确认且进入正式Release的融资事件")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资事件次数与占比 <small>{candidate_industries["total"]}条候选观察样本</small></h3><div class="ranking-list candidate-industry-ranking">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-trend"><h3>近6个月融资趋势</h3><p>柱：已披露精确金额　点上数字：正式事件数</p><div class="capital-trend-chart">{trend}</div></article><article class="capital-panel capital-structure"><h3>本月资金结构（按轮次） <small>{candidate_rounds["total"]}条候选观察样本</small></h3>{ring}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></section>'''
 
 
 def v30_home(overview: dict) -> HTMLResponse:
@@ -339,14 +339,13 @@ async def companies(request: Request):
 
 
 async def repeated_companies(request: Request):
-    groups = service.v30_repeated_candidate_companies()
+    groups = service.v34_merged_candidate_sources()
     taxonomy = service.v30_taxonomy()
     sections = []
     for group in groups:
-        badge_class = "confirmed" if group["finding"] == "明确多轮融资" else "review"
-        sections.append(f'''<section class="panel repeated-company"><div class="section-head"><div><span class="repeat-badge {badge_class}">{esc(group["finding"])}</span><h2><a href="/companies/{esc(group["company_id"])}">{esc(group["company_name"])}</a></h2><p>{esc(group["note"])}</p></div><strong>{len(group["records"])}条记录</strong></div>{v30_classified_rows(group["records"],taxonomy)}</section>''')
-    body = f'''<div class="page-shell subpage"><a class="back" href="/">← 返回首页</a><span class="kicker">REPEATED FUNDING REVIEW</span><h1>重复融资企业</h1><p class="lede">97条候选记录涉及95家企业，共有{len(groups)}家企业出现多条记录。明确多轮融资与疑似重复来源分开标注，结果不代表人工审核决定。</p>{"".join(sections) or empty_state("暂无重复融资企业","当前候选记录中没有同一企业的多条记录。")}</div>'''
-    return page("重复融资企业", body, "/companies")
+        sections.append(f'''<section class="panel repeated-company"><div class="section-head"><div><span class="repeat-badge confirmed">已合并重复来源</span><h2><a href="/companies/{esc(group["company_id"])}">{esc(group["company_name"])}</a></h2><p>{esc(group["reason"])}</p></div><strong>保留1个事件</strong></div>{v30_classified_rows(group["records"],taxonomy)}</section>''')
+    body = f'''<div class="page-shell subpage"><a class="back" href="/">← 返回首页</a><span class="kicker">SOURCE MERGE AUDIT</span><h1>重复来源合并记录</h1><p class="lede">原始97条来源记录完整保留；两组重复来源经用户确认后合并为95个候选融资事件。以下展示主记录与被合并来源，网站统计仅计一次。</p>{"".join(sections) or empty_state("暂无重复来源合并记录","当前没有已确认的重复来源合并决定。")}</div>'''
+    return page("重复来源合并记录", body, "/companies")
 async def company_detail(request: Request):
     company=service.v30_company(request.path_params["company_id"])
     if company:
