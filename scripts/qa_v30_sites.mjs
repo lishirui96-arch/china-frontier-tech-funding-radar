@@ -34,6 +34,11 @@ try {
     if (!text.includes("本月暂无人工确认的正式融资事件") || !text.includes("各领域融资事件次数与占比") || !text.includes("已披露融资金额")) throw new Error(`monthly capital flow layout failed: ${config.name}`);
     if (!text.includes("95条候选观察样本") || !text.includes("VC（Pre-A–B++）") || !text.includes("69.5%") || !text.includes("早期（种子/天使）") || !text.includes("30.5%")) throw new Error(`candidate round donut failed: ${config.name}`);
     if (!text.includes("候选融资事件数") || !text.includes("95 起") || !text.includes("涉及企业数（候选）") || !text.includes("95 家") || !text.includes("覆盖产业领域数（候选）") || !text.includes("10 个")) throw new Error(`candidate metric cards failed: ${config.name}`);
+    if (text.includes("近6个月融资趋势") || !text.includes("VC（Pre-A–B++） 产业领域分布") || !text.includes("66 起") || !text.includes("66 家") || !text.includes("9 个")) throw new Error(`round industry default view failed: ${config.name}`);
+    await page.locator('[data-round-key="early"]').click();
+    const earlyView = page.locator('[data-round-view="early"]');
+    if (!(await earlyView.isVisible()) || !(await earlyView.innerText()).includes("29 起")) throw new Error(`round industry interaction failed: ${config.name}`);
+    await page.locator('[data-round-key="vc"]').click();
     const repeatedHref = await page.locator('.capital-metrics a[href="/companies/repeated"]').getAttribute('href');
     if (repeatedHref !== "/companies/repeated") throw new Error(`repeated company metric link failed: ${config.name}`);
     await page.goto(`http://127.0.0.1:8511${repeatedHref}`, { waitUntil: "networkidle" });

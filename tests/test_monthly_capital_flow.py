@@ -96,6 +96,9 @@ def test_public_api_and_home_show_real_empty_state():
     assert "涉及企业数（候选）" in home and "95 家" in home
     assert 'href="/companies/repeated"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
+    assert "近6个月融资趋势" not in home
+    assert "VC（Pre-A–B++） 产业领域分布" in home
+    assert "占全部候选样本" in home
     repeated = client.get("/companies/repeated")
     assert repeated.status_code == 200
     assert "谱星航天" in repeated.text and "已合并重复来源" in repeated.text

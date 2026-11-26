@@ -75,6 +75,19 @@ def test_candidate_round_structure_groups_and_deduplicates():
     assert result["queue_counts"] == {"A": 3, "B": 2}
 
 
+def test_candidate_round_structure_builds_industry_distribution():
+    industries = [{"industry_id": "robot", "name": "机器人"}, {"industry_id": "chip", "name": "半导体"}]
+    events = [
+        {"record_id": "1", "company_id": "a", "round_original": "A轮", "classification": {"primary_industry_id": "robot"}},
+        {"record_id": "2", "company_id": "b", "round_original": "B轮", "classification": {"primary_industry_id": "robot"}},
+        {"record_id": "3", "company_id": "c", "round_original": "A+轮", "classification": {"primary_industry_id": "chip"}},
+    ]
+    result = candidate_round_structure(events, industries)
+    vc = result["groups"][0]
+    assert vc["count"] == 3 and vc["company_count"] == 3 and vc["industry_count"] == 2
+    assert [(row["industry_name"], row["event_count"]) for row in vc["industries"]] == [("机器人", 2), ("半导体", 1)]
+
+
 def test_candidate_industry_structure_counts_unique_records():
     industries = [{"industry_id": "robot", "name": "机器人"}, {"industry_id": "ai", "name": "AI计算"}]
     events = [

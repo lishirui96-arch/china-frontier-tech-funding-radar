@@ -171,7 +171,7 @@ def aggregate_monthly_capital_flow(
     }
 
 
-def candidate_round_structure(events: list[dict[str, Any]]) -> dict[str, Any]:
+def candidate_round_structure(events: list[dict[str, Any]], industries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     groups = [
         {"key": "vc", "label": "VC（Pre-A–B++）", "count": 0},
         {"key": "early", "label": "早期（种子/天使）", "count": 0},
@@ -179,6 +179,7 @@ def candidate_round_structure(events: list[dict[str, Any]]) -> dict[str, Any]:
         {"key": "other", "label": "其他", "count": 0},
     ]
     lookup = {item["key"]: item for item in groups}
+    grouped_events: dict[str, list[dict[str, Any]]] = {item["key"]: [] for item in groups}
     unique: dict[str, dict[str, Any]] = {}
     for event in events:
         key = str(event.get("record_id") or event.get("unique_event_id") or "")
@@ -195,9 +196,23 @@ def candidate_round_structure(events: list[dict[str, Any]]) -> dict[str, Any]:
         else:
             bucket = "other"
         lookup[bucket]["count"] += 1
+        grouped_events[bucket].append(event)
     total = len(unique)
+    industry_names = {row["industry_id"]: row["name"] for row in (industries or [])}
     for item in groups:
         item["share"] = item["count"] / total if total else 0
+        bucket_events = grouped_events[item["key"]]
+        industry_counts: dict[str, int] = {}
+        for event in bucket_events:
+            industry_id = str((event.get("classification") or {}).get("primary_industry_id") or "")
+            if industry_id:
+                industry_counts[industry_id] = industry_counts.get(industry_id, 0) + 1
+        rows = [{"industry_id": industry_id, "industry_name": industry_names.get(industry_id, "待分类"),
+                 "event_count": count, "share": count / item["count"] if item["count"] else 0}
+                for industry_id, count in industry_counts.items()]
+        item["industries"] = sorted(rows, key=lambda row: (-row["event_count"], row["industry_name"]))
+        item["company_count"] = len({str(event.get("company_id")) for event in bucket_events if event.get("company_id")})
+        item["industry_count"] = len(industry_counts)
     queues: dict[str, int] = {}
     for event in unique.values():
         queue = str(event.get("queue_class") or "未知")
@@ -445,7 +460,7 @@ class PublicDataService:
 
     def v30_candidate_round_structure(self) -> dict[str, Any]:
         overview = self.v30_overview()
-        return candidate_round_structure((overview or {}).get("events", []))
+        return candidate_round_structure((overview or {}).get("events", []), self.v30_taxonomy()["industries"])
 
     def v30_candidate_industry_structure(self) -> dict[str, Any]:
         overview = self.v30_overview()
