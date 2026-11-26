@@ -48,6 +48,10 @@ try {
     await page.screenshot({ path: path.join(out, `8511_theme_${config.name}.png`), fullPage: true });
     const themeText = await page.locator("body").innerText();
     if (!themeText.includes("唯一候选事件") || !themeText.includes("融资事件时间线")) throw new Error(`theme assertions failed: ${config.name}`);
+    const themeHeaders = await page.locator(".classified-table thead th").allTextContents();
+    if (JSON.stringify(themeHeaders) !== JSON.stringify(homeHeaders)) throw new Error(`theme headers differ from home: ${config.name}`);
+    if (!(await page.locator(".event-detail .company-cell small").first().isVisible())) throw new Error(`theme company profile missing: ${config.name}`);
+    if (!(await page.locator(".event-detail .track-cell small").first().isVisible())) throw new Error(`theme secondary field missing: ${config.name}`);
     const themeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     if (themeOverflow) throw new Error(`theme horizontal overflow: ${config.name}`);
     results.push({ site: 8511, viewport: config.name, errors, homeOverflow, themeOverflow });
