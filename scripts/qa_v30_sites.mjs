@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { chromium } = require("playwright");
 
 const root = path.resolve(import.meta.dirname, "..");
 const out = path.join(root, "work", "v30_qa");
@@ -26,7 +29,7 @@ try {
     await page.goto("http://127.0.0.1:8511", { waitUntil: "networkidle" });
     await page.screenshot({ path: path.join(out, `8511_home_${config.name}.png`), fullPage: true });
     const text = await page.locator("body").innerText();
-    if (!text.includes("10个产业方向") || !text.includes("22 / 79 / 18") || !text.includes("历史候选记录")) throw new Error(`V3 home assertions failed: ${config.name}`);
+    if (!text.includes("10个产业方向") || !text.includes("41个技术领域") || !text.includes("50个候选主题") || !text.includes("22 / 79 / 18") || !text.includes("共97条")) throw new Error(`V3.1 home assertions failed: ${config.name}`);
     const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     if (homeOverflow) throw new Error(`home horizontal overflow: ${config.name}`);
     await page.goto("http://127.0.0.1:8511/taxonomy", { waitUntil: "networkidle" });
