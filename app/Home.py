@@ -82,6 +82,7 @@ page = st.navigation({
         st.Page("app_pages/22_v23_topic_adjudication.py", title="V2.3主题人工裁决", icon=":material/gavel:", help="审核多企业主题、观察项、合并预览和待拆分主题；所有决定需人工提交。"),
         st.Page("app_pages/23_v231_admission_review.py", title="V2.3.1主题准入审查", icon=":material/fact_check:", help="查看14个拟确认主题的第二轮质量审查、成员证据等级、实体重复和主题交叉建议。"),
         st.Page("app_pages/24_v30_taxonomy_migration.py", title="V3.0分类与历史迁移", icon=":material/account_tree:", help="管理冻结的10→38→34分类体系，审核97条历史记录归类及关联变更。"),
+        st.Page("app_pages/25_v31_pending_classification.py", title="21条待分类来源复核", icon=":material/manage_search:", help="查看21条原始来源中的主营业务、产品、技术和V3.1分类增量建议。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),
