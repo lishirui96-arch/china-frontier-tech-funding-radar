@@ -3,7 +3,7 @@ from __future__ import annotations
 from starlette.testclient import TestClient
 
 from funding_radar.db import connect
-from funding_radar.public_service import PublicDataService
+from funding_radar.public_service import PublicDataService, candidate_round_structure
 from funding_radar.review_service import change_release_status
 from funding_radar.services import create_release
 from tests.conftest import add_company, add_document, add_event, add_required_evidence
@@ -58,3 +58,18 @@ def test_public_pages_have_responsive_viewport(monkeypatch, db):
     monkeypatch.setattr(site, "service", PublicDataService(db))
     html = TestClient(site.app).get("/").text
     assert 'name="viewport"' in html and "/static/site.css" in html
+
+
+def test_candidate_round_structure_groups_and_deduplicates():
+    events = [
+        {"record_id": "1", "round_original": "天使轮", "queue_class": "A"},
+        {"record_id": "2", "round_original": "Seed", "queue_class": "B"},
+        {"record_id": "3", "round_original": "Pre-A轮", "queue_class": "A"},
+        {"record_id": "4", "round_original": "B++轮", "queue_class": "A"},
+        {"record_id": "5", "round_original": "战略投资", "queue_class": "B"},
+        {"record_id": "5", "round_original": "战略投资", "queue_class": "B"},
+    ]
+    result = candidate_round_structure(events)
+    assert result["total"] == 5
+    assert [group["count"] for group in result["groups"]] == [2, 2, 1, 0]
+    assert result["queue_counts"] == {"A": 3, "B": 2}

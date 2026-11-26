@@ -171,6 +171,41 @@ def aggregate_monthly_capital_flow(
     }
 
 
+def candidate_round_structure(events: list[dict[str, Any]]) -> dict[str, Any]:
+    groups = [
+        {"key": "vc", "label": "VC（Pre-A–B++）", "count": 0},
+        {"key": "early", "label": "早期（种子/天使）", "count": 0},
+        {"key": "strategic", "label": "战略投资 / 并购", "count": 0},
+        {"key": "other", "label": "其他", "count": 0},
+    ]
+    lookup = {item["key"]: item for item in groups}
+    unique: dict[str, dict[str, Any]] = {}
+    for event in events:
+        key = str(event.get("record_id") or event.get("unique_event_id") or "")
+        if key and key not in unique:
+            unique[key] = event
+    for event in unique.values():
+        value = str(event.get("round_original") or "").strip().casefold()
+        if any(token in value for token in ("seed", "angel", "种子", "天使")):
+            bucket = "early"
+        elif any(token in value for token in ("战略", "并购", "收购", "strategic")):
+            bucket = "strategic"
+        elif re.search(r"(?:pre[- ]?[ab]|[ab](?:\+{1,2}|\d)?)(?:轮)?", value):
+            bucket = "vc"
+        else:
+            bucket = "other"
+        lookup[bucket]["count"] += 1
+    total = len(unique)
+    for item in groups:
+        item["share"] = item["count"] / total if total else 0
+    queues: dict[str, int] = {}
+    for event in unique.values():
+        queue = str(event.get("queue_class") or "未知")
+        queues[queue] = queues.get(queue, 0) + 1
+    return {"scope": "A_B_candidate_observation", "total": total, "groups": groups, "queue_counts": queues,
+            "note": "VC口径包含Pre-A、A、A+、A++、Pre-B、B、B+、B++等成长阶段融资"}
+
+
 class PublicDataService:
     """Read-only facade over immutable, currently published release snapshots."""
 
@@ -333,6 +368,10 @@ class PublicDataService:
     def formal_released_events(self) -> list[dict[str, Any]]:
         events, _ = self._strict_formal_events()
         return events
+
+    def v30_candidate_round_structure(self) -> dict[str, Any]:
+        overview = self.v30_overview()
+        return candidate_round_structure((overview or {}).get("events", []))
 
     def internal_monthly_quality_preview(self) -> dict[str, Any]:
         confirmed = self._rows("SELECT COUNT(*) n FROM v15_confirmed_funding_events WHERE is_active=1")[0]["n"]

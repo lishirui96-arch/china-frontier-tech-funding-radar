@@ -32,6 +32,7 @@ try {
     if (!text.includes("10个产业方向") || !text.includes("42个技术领域") || !text.includes("51个候选主题") || !text.includes("97 / 0") || !text.includes("共97条")) throw new Error(`V3.2 home assertions failed: ${config.name}`);
     if (text.includes("正式/A/B")) throw new Error(`legacy formal candidate metric still visible: ${config.name}`);
     if (!text.includes("本月暂无人工确认的正式融资事件") || !text.includes("各领域融资规模与占比") || !text.includes("已披露融资金额")) throw new Error(`monthly capital flow layout failed: ${config.name}`);
+    if (!text.includes("97条候选观察样本") || !text.includes("VC（Pre-A–B++）") || !text.includes("70.1%") || !text.includes("早期（种子/天使）") || !text.includes("29.9%")) throw new Error(`candidate round donut failed: ${config.name}`);
     if (text.includes("资本流向：资金由市场流入各产业领域")) throw new Error(`obsolete capital flow panel still visible: ${config.name}`);
     const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     if (homeOverflow) throw new Error(`home horizontal overflow: ${config.name}`);
