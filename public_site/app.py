@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -124,6 +125,49 @@ def event_table(data: dict, filters: PublicFilters) -> str:
     return f'<div class="table-scroll"><table><thead><tr><th>日期</th><th>企业</th><th>赛道</th><th>融资轮次</th><th>融资金额</th><th>投资方</th><th>原始来源</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>{pager}'
 
 
+def v30_classified_rows(events: list[dict], taxonomy: dict[str, list[dict]]) -> str:
+    topic_names = {item["topic_id"]: item["name"] for item in taxonomy["topics"]}
+    field_names = {item["field_id"]: item["name"] for item in taxonomy["fields"]}
+    industry_names = {item["industry_id"]: item["name"] for item in taxonomy["industries"]}
+    classified = [event for event in events if event["classification"].get("primary_topic_id")]
+    if not classified:
+        return empty_state("暂无已分类融资记录", "完成企业技术画像与主主题关联后，记录将在这里展示。")
+    rows = []
+    for event in sorted(classified, key=lambda item: (item.get("disclosure_date", ""), item.get("company_name_standard", "")), reverse=True):
+        classification = event["classification"]
+        track = (
+            topic_names.get(classification.get("primary_topic_id"))
+            or field_names.get(classification.get("primary_field_id"))
+            or industry_names.get(classification.get("primary_industry_id"))
+            or "待分类"
+        )
+        business = event.get("primary_business") or "主营业务待补充"
+        company_name = esc(event.get("company_name_standard") or event.get("company_name_original") or "未命名企业")
+        company_id = event.get("company_id")
+        company = f'<a href="/companies/{esc(company_id)}">{company_name}</a>' if company_id else company_name
+        investors = str(event.get("investors_original") or "").strip()
+        if investors.startswith("["):
+            try:
+                parsed_investors = json.loads(investors)
+                if isinstance(parsed_investors, list):
+                    investors = "、".join(str(item).strip() for item in parsed_investors if str(item).strip())
+            except json.JSONDecodeError:
+                pass
+        if not investors or investors in {"未结构化提取", "待结构化", "未披露"}:
+            investors = "未披露或待结构化"
+        source_label = event.get("source_platform") or "查看原文"
+        source = f'<a href="{esc(event["source_url"])}" target="_blank" rel="noopener noreferrer">{esc(source_label)}<i data-lucide="external-link"></i></a>'
+        rows.append(
+            f'<tr><td>{esc(event["disclosure_date"])}</td>'
+            f'<td class="company-cell">{company}<small>{esc(business)}</small></td>'
+            f'<td><span class="track-tag">{esc(track)}</span></td>'
+            f'<td>{esc(event.get("round_original") or "未披露")}</td>'
+            f'<td>{esc(event.get("amount_original") or "未披露")}</td>'
+            f'<td>{esc(investors)}</td><td>{source}</td></tr>'
+        )
+    return f'<div class="table-scroll classified-table"><table class="taxonomy-table"><thead><tr><th>日期</th><th>企业</th><th>赛道</th><th>轮次</th><th>金额</th><th>投资方</th><th>来源</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+
+
 def v30_event_rows(events: list[dict]) -> str:
     if not events: return empty_state("暂无关联融资事件", "当前主题尚无已归类记录。")
     rows = []
@@ -143,7 +187,7 @@ def v30_home(overview: dict) -> HTMLResponse:
         counts[key] = counts.get(key, 0) + 1
     cards = "".join((metric("历史候选记录","database",str(manifest["source_records"])),metric("唯一候选事件","landmark",str(manifest["unique_candidate_events"])),metric("原正式事件","badge-check",str(manifest["formal_events"])),metric("三级候选主题","network",str(manifest["topics"]))))
     industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
-    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · V3.0</span><h1>中国前沿科技融资热点雷达</h1><p>以10个产业方向、38个技术领域和34个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>V3.0 · frozen</dd></div><div><dt>正式/A/B</dt><dd>{manifest["formal_events"]} / {manifest["a_candidates"]} / {manifest["b_candidates"]}</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell"><section class="metrics">{cards}</section><p class="notice"><i data-lucide="info"></i>正式事件、A类候选和B类候选分开统计。候选记录不是人工确认的正式融资事件。</p><section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">LATEST CANDIDATES</span><h2>最新历史候选记录</h2><p>仅展示Release快照中的审核状态</p></div></div>{v30_event_rows(events[:12])}</section></div>'''
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · V3.0</span><h1>中国前沿科技融资热点雷达</h1><p>以10个产业方向、38个技术领域和34个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>V3.0 · frozen</dd></div><div><dt>正式/A/B</dt><dd>{manifest["formal_events"]} / {manifest["a_candidates"]} / {manifest["b_candidates"]}</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell"><section class="metrics">{cards}</section><p class="notice"><i data-lucide="info"></i>正式事件、A类候选和B类候选分开统计。候选记录不是人工确认的正式融资事件。</p><section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">CLASSIFIED FUNDING RECORDS</span><h2>已分类融资记录</h2><p>共{len(classified_events)}条 · 企业下方展示现有主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
     return page("首页", body, "/")
 
 
