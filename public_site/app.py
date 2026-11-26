@@ -46,9 +46,10 @@ def page(title: str, body: str, active: str = "", query: str = "") -> HTMLRespon
     return HTMLResponse(f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="中国前沿科技融资热点研究平台"><link rel="icon" href="/favicon.ico"><title>{esc(title)} · 中国前沿科技融资热点雷达</title><link rel="stylesheet" href="/static/site.css"><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script></head><body>{nav(active,query)}<main>{body}</main><footer><div><b>中国前沿科技融资热点雷达</b><p>当前分类Release分别展示正式事件、A类候选与B类候选，候选状态不代表人工确认。</p></div><a href="/methodology">数据口径与证据规则</a></footer><script>if(window.lucide)lucide.createIcons();</script></body></html>''')
 
 
-def metric(label: str, icon: str, value: str | None) -> str:
+def metric(label: str, icon: str, value: str | None, href: str = "") -> str:
     shown = esc(value) if value is not None else '<span class="pending">暂无已发布数据</span>'
-    return f'<article class="metric"><i data-lucide="{icon}"></i><div><span>{label}</span><strong>{shown}</strong></div></article>'
+    content = f'<i data-lucide="{icon}"></i><div><span>{label}</span><strong>{shown}</strong></div>'
+    return f'<a class="metric metric-link" href="{esc(href)}">{content}<i class="metric-arrow" data-lucide="arrow-up-right"></i></a>' if href else f'<article class="metric">{content}</article>'
 
 
 def filter_url(filters: PublicFilters, **changes: object) -> str:
@@ -195,7 +196,7 @@ def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries
     cards = "".join((
         metric("本月融资总额", "coins", amount_summary),
         metric("候选融资事件数", "layers-3", f'{candidate_industries["total"]} 起'),
-        metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家'),
+        metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家', "/companies/repeated"),
         metric("覆盖产业领域数（候选）", "network", f'{candidate_industries["industry_count"]} 个'),
     ))
     ranking_rows = []
@@ -335,6 +336,17 @@ async def companies(request: Request):
         release=service.v30_release(); manifest=json.loads(release["manifest_json"]) if release else {}
         return page("企业库",f'<div class="page-shell subpage"><span class="kicker">COMPANY DIRECTORY</span><h1>企业库</h1><p class="lede">覆盖{esc(manifest.get("taxonomy_version","当前"))} Release中的候选企业；审核状态不会被隐藏。</p><div class="company-grid">{cards}</div></div>',"/companies")
     return listing("企业库","COMPANY DIRECTORY","仅展示有效 Release 中的企业。","暂无已发布企业","/companies")
+
+
+async def repeated_companies(request: Request):
+    groups = service.v30_repeated_candidate_companies()
+    taxonomy = service.v30_taxonomy()
+    sections = []
+    for group in groups:
+        badge_class = "confirmed" if group["finding"] == "明确多轮融资" else "review"
+        sections.append(f'''<section class="panel repeated-company"><div class="section-head"><div><span class="repeat-badge {badge_class}">{esc(group["finding"])}</span><h2><a href="/companies/{esc(group["company_id"])}">{esc(group["company_name"])}</a></h2><p>{esc(group["note"])}</p></div><strong>{len(group["records"])}条记录</strong></div>{v30_classified_rows(group["records"],taxonomy)}</section>''')
+    body = f'''<div class="page-shell subpage"><a class="back" href="/">← 返回首页</a><span class="kicker">REPEATED FUNDING REVIEW</span><h1>重复融资企业</h1><p class="lede">97条候选记录涉及95家企业，共有{len(groups)}家企业出现多条记录。明确多轮融资与疑似重复来源分开标注，结果不代表人工审核决定。</p>{"".join(sections) or empty_state("暂无重复融资企业","当前候选记录中没有同一企业的多条记录。")}</div>'''
+    return page("重复融资企业", body, "/companies")
 async def company_detail(request: Request):
     company=service.v30_company(request.path_params["company_id"])
     if company:
@@ -397,6 +409,6 @@ async def monthly_capital_flow_api(request: Request):
     return JSONResponse(data, headers={"Cache-Control":"public, max-age=300"})
 
 
-routes=[Route("/",home),Route("/api/monthly-capital-flow",monthly_capital_flow_api),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
+routes=[Route("/",home),Route("/api/monthly-capital-flow",monthly_capital_flow_api),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/repeated",repeated_companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
 app=Starlette(debug=False,routes=routes)
 app.mount("/static",StaticFiles(directory=STATIC),name="static")

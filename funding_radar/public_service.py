@@ -230,6 +230,37 @@ def candidate_industry_structure(events: list[dict[str, Any]], industries: list[
             "industry_count": sum(1 for row in rows if row["event_count"] > 0)}
 
 
+def repeated_candidate_companies(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for event in events:
+        company_id = str(event.get("company_id") or "")
+        if company_id:
+            grouped.setdefault(company_id, []).append(event)
+    results = []
+    for company_id, records in grouped.items():
+        unique = {str(record.get("record_id") or record.get("unique_event_id") or ""): record for record in records}
+        rows = list(unique.values())
+        if len(rows) < 2:
+            continue
+        sources = {str(row.get("source_platform") or "") for row in rows}
+        dates = {str(row.get("disclosure_date") or "") for row in rows}
+        amounts = {str(row.get("amount_original") or "") for row in rows}
+        rounds = {str(row.get("round_original") or "") for row in rows}
+        if len(sources) == 1 and len(dates) == 1 and len(rounds) > 1:
+            finding = "明确多轮融资"
+            note = "同一来源在同一披露日明确列出不同融资轮次，按不同事件保留。"
+        elif len(sources) > 1 and len(amounts) == 1:
+            finding = "疑似重复来源"
+            note = "不同来源披露金额相同但轮次或日期存在差异，需要人工核验是否为同一融资事件。"
+        else:
+            finding = "需要人工核验"
+            note = "同一企业存在多条融资记录，需结合原始报道判断事件关系。"
+        rows.sort(key=lambda row: (str(row.get("disclosure_date") or ""), str(row.get("record_id") or "")))
+        results.append({"company_id": company_id, "company_name": rows[0].get("company_name_standard") or "未命名企业",
+                        "finding": finding, "note": note, "records": rows})
+    return sorted(results, key=lambda row: (row["finding"], row["company_name"]))
+
+
 class PublicDataService:
     """Read-only facade over immutable, currently published release snapshots."""
 
@@ -401,6 +432,10 @@ class PublicDataService:
         overview = self.v30_overview()
         taxonomy = self.v30_taxonomy()
         return candidate_industry_structure((overview or {}).get("events", []), taxonomy["industries"])
+
+    def v30_repeated_candidate_companies(self) -> list[dict[str, Any]]:
+        overview = self.v30_overview()
+        return repeated_candidate_companies((overview or {}).get("events", []))
 
     def internal_monthly_quality_preview(self) -> dict[str, Any]:
         confirmed = self._rows("SELECT COUNT(*) n FROM v15_confirmed_funding_events WHERE is_active=1")[0]["n"]

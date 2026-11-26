@@ -94,7 +94,12 @@ def test_public_api_and_home_show_real_empty_state():
     assert "/events?industry_id=" in home
     assert "候选融资事件数" in home and "97 起" in home
     assert "涉及企业数（候选）" in home and "95 家" in home
+    assert 'href="/companies/repeated"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
+    repeated = client.get("/companies/repeated")
+    assert repeated.status_code == 200
+    assert "谱星航天" in repeated.text and "明确多轮融资" in repeated.text
+    assert "蓝固新能源" in repeated.text and "疑似重复来源" in repeated.text
     assert home.index("本月资本流向概览") < home.index("产业技术分类导航")
     formal = client.get("/events?scope=formal&industry_id=robot").text
     assert "暂无人工确认的正式融资事件" in formal

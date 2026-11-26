@@ -34,6 +34,15 @@ try {
     if (!text.includes("本月暂无人工确认的正式融资事件") || !text.includes("各领域融资事件次数与占比") || !text.includes("已披露融资金额")) throw new Error(`monthly capital flow layout failed: ${config.name}`);
     if (!text.includes("97条候选观察样本") || !text.includes("VC（Pre-A–B++）") || !text.includes("70.1%") || !text.includes("早期（种子/天使）") || !text.includes("29.9%")) throw new Error(`candidate round donut failed: ${config.name}`);
     if (!text.includes("候选融资事件数") || !text.includes("97 起") || !text.includes("涉及企业数（候选）") || !text.includes("95 家") || !text.includes("覆盖产业领域数（候选）") || !text.includes("10 个")) throw new Error(`candidate metric cards failed: ${config.name}`);
+    const repeatedHref = await page.locator('.capital-metrics a[href="/companies/repeated"]').getAttribute('href');
+    if (repeatedHref !== "/companies/repeated") throw new Error(`repeated company metric link failed: ${config.name}`);
+    await page.goto(`http://127.0.0.1:8511${repeatedHref}`, { waitUntil: "networkidle" });
+    const repeatedText = await page.locator("body").innerText();
+    if (!repeatedText.includes("谱星航天") || !repeatedText.includes("明确多轮融资") || !repeatedText.includes("蓝固新能源") || !repeatedText.includes("疑似重复来源")) throw new Error(`repeated company page failed: ${config.name}`);
+    const repeatedOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    if (repeatedOverflow) throw new Error(`repeated company horizontal overflow: ${config.name}`);
+    await page.screenshot({ path: path.join(out, `8511_repeated_companies_${config.name}.png`), fullPage: true });
+    await page.goto("http://127.0.0.1:8511", { waitUntil: "networkidle" });
     if (text.includes("资本流向：资金由市场流入各产业领域")) throw new Error(`obsolete capital flow panel still visible: ${config.name}`);
     const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     if (homeOverflow) throw new Error(`home horizontal overflow: ${config.name}`);

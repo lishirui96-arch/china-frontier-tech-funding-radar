@@ -3,7 +3,7 @@ from __future__ import annotations
 from starlette.testclient import TestClient
 
 from funding_radar.db import connect
-from funding_radar.public_service import PublicDataService, candidate_industry_structure, candidate_round_structure
+from funding_radar.public_service import PublicDataService, candidate_industry_structure, candidate_round_structure, repeated_candidate_companies
 from funding_radar.review_service import change_release_status
 from funding_radar.services import create_release
 from tests.conftest import add_company, add_document, add_event, add_required_evidence
@@ -87,3 +87,14 @@ def test_candidate_industry_structure_counts_unique_records():
     assert result["total"] == 3 and result["classified"] == 3 and result["unclassified"] == 0
     assert result["company_count"] == 0 and result["industry_count"] == 2
     assert [(row["industry_id"], row["event_count"]) for row in result["industries"]] == [("robot", 2), ("ai", 1)]
+
+
+def test_repeated_candidate_companies_distinguishes_rounds_and_sources():
+    events = [
+        {"record_id": "1", "company_id": "a", "company_name_standard": "甲", "source_platform": "媒体一", "disclosure_date": "2026-11-01", "round_original": "Pre-A", "amount_original": "合计1亿元"},
+        {"record_id": "2", "company_id": "a", "company_name_standard": "甲", "source_platform": "媒体一", "disclosure_date": "2026-11-01", "round_original": "A", "amount_original": "合计1亿元"},
+        {"record_id": "3", "company_id": "b", "company_name_standard": "乙", "source_platform": "媒体一", "disclosure_date": "2026-11-02", "round_original": "B", "amount_original": "近2亿元"},
+        {"record_id": "4", "company_id": "b", "company_name_standard": "乙", "source_platform": "媒体二", "disclosure_date": "2026-11-03", "round_original": "B+", "amount_original": "近2亿元"},
+    ]
+    result = repeated_candidate_companies(events)
+    assert {row["company_name"]: row["finding"] for row in result} == {"甲": "明确多轮融资", "乙": "疑似重复来源"}
