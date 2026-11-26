@@ -111,6 +111,73 @@ class PublicDataService:
             events.append(event)
         return PublicRelease(active["release_id"], active["release_name"], active["created_at"], active["content_hash"], tuple(events))
 
+    def v30_release(self) -> dict[str, Any] | None:
+        rows = self._rows("SELECT * FROM v30_releases WHERE status='published' ORDER BY created_at DESC LIMIT 1")
+        return rows[0] if rows else None
+
+    def v30_overview(self) -> dict[str, Any] | None:
+        release = self.v30_release()
+        if not release: return None
+        manifest = json.loads(release["manifest_json"])
+        records = self._rows("SELECT event_snapshot_json,classification_snapshot_json FROM v30_release_records WHERE release_id=? ORDER BY position", (release["release_id"],))
+        events = []
+        for row in records:
+            event = json.loads(row["event_snapshot_json"])
+            event["classification"] = json.loads(row["classification_snapshot_json"])
+            events.append(event)
+        return {"release": release, "manifest": manifest, "events": events}
+
+    def v30_taxonomy(self) -> dict[str, list[dict[str, Any]]]:
+        release = self.v30_release()
+        if not release: return {"industries": [], "fields": [], "topics": []}
+        rows = self._rows("SELECT entity_type,snapshot_json FROM v30_release_taxonomy WHERE release_id=? ORDER BY position", (release["release_id"],))
+        result = {"industries": [], "fields": [], "topics": []}
+        names = {"industry": "industries", "field": "fields", "topic": "topics"}
+        for row in rows: result[names[row["entity_type"]]].append(json.loads(row["snapshot_json"]))
+        return result
+
+    def v30_industry(self, industry_id: str) -> dict[str, Any] | None:
+        taxonomy = self.v30_taxonomy(); overview = self.v30_overview()
+        industry = next((x for x in taxonomy["industries"] if x["industry_id"] == industry_id), None)
+        if not industry: return None
+        fields = [x for x in taxonomy["fields"] if x["industry_id"] == industry_id]
+        field_ids = {x["field_id"] for x in fields}
+        topics = [x for x in taxonomy["topics"] if x["field_id"] in field_ids]
+        return {"industry": industry, "fields": fields, "topics": topics, "events": (overview or {}).get("events", [])}
+
+    def v30_field(self, field_id: str) -> dict[str, Any] | None:
+        taxonomy = self.v30_taxonomy(); overview = self.v30_overview()
+        field = next((x for x in taxonomy["fields"] if x["field_id"] == field_id), None)
+        if not field: return None
+        industry = next((x for x in taxonomy["industries"] if x["industry_id"] == field["industry_id"]), None)
+        topics = [x for x in taxonomy["topics"] if x["field_id"] == field_id]
+        return {"field": field, "industry": industry, "topics": topics, "events": (overview or {}).get("events", [])}
+
+    def v30_topic(self, topic_id: str) -> dict[str, Any] | None:
+        taxonomy = self.v30_taxonomy(); overview = self.v30_overview()
+        topic = next((x for x in taxonomy["topics"] if x["topic_id"] == topic_id), None)
+        if not topic: return None
+        field = next(x for x in taxonomy["fields"] if x["field_id"] == topic["field_id"])
+        industry = next(x for x in taxonomy["industries"] if x["industry_id"] == field["industry_id"])
+        events = [x for x in (overview or {}).get("events", []) if topic_id in x["classification"].get("topic_ids", [])]
+        companies = {x["company_id"]: {"company_id": x["company_id"], "name": x["company_name_standard"],
+                     "business": x.get("primary_business", "待补充"), "products": x.get("core_products", "待补充"),
+                     "technologies": x.get("core_technologies", "待补充")} for x in events if x.get("company_id")}
+        rounds: dict[str, int] = {}
+        for event in events: rounds[event["round_original"]] = rounds.get(event["round_original"], 0) + 1
+        return {"topic": topic, "field": field, "industry": industry, "events": events,
+                "companies": list(companies.values()), "rounds": rounds}
+
+    def v30_company(self, company_id: str) -> dict[str, Any] | None:
+        overview = self.v30_overview()
+        if not overview: return None
+        events = [x for x in overview["events"] if x.get("company_id") == company_id]
+        if not events: return None
+        first = events[0]
+        return {"company_id": company_id, "name": first["company_name_standard"],
+                "business": first.get("primary_business") or "待补充", "products": first.get("core_products") or "待补充",
+                "technologies": first.get("core_technologies") or "待补充", "events": events}
+
     def overview(self) -> dict[str, Any]:
         release = self.current_release()
         if not release:

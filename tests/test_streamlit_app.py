@@ -35,6 +35,7 @@ def test_all_internal_pages_render(monkeypatch, tmp_path):
         "app_pages/21_v22_taxonomy.py",
         "app_pages/22_v23_topic_adjudication.py",
         "app_pages/23_v231_admission_review.py",
+        "app_pages/24_v30_taxonomy_migration.py",
     ]:
         at.switch_page(page).run()
         assert not at.exception

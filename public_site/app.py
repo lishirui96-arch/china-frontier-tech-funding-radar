@@ -36,13 +36,13 @@ def empty_state(title: str, detail: str) -> str:
 
 
 def nav(active: str, query: str = "") -> str:
-    links = (("首页","/"),("六大学科","/fields"),("融资赛道","/tracks"),("新兴方向","/emerging"),("企业库","/companies"),("投资机构","/investors"),("数据说明","/methodology"))
+    links = (("首页","/"),("产业技术分类","/taxonomy"),("融资事件","/events"),("企业库","/companies"),("数据说明","/methodology"))
     items = "".join(f'<a class="{"active" if href==active else ""}" href="{href}">{label}</a>' for label,href in links)
     return f'''<header class="topbar"><a class="brand" href="/"><span class="brand-mark">融</span><span><b>中国前沿科技融资热点雷达</b><small>China Frontier Tech Funding Radar</small></span></a><nav>{items}</nav><form class="search" action="/search"><i data-lucide="search"></i><input name="q" value="{esc(query)}" placeholder="搜索企业、技术、赛道或机构" aria-label="全站搜索"></form><button class="menu" aria-label="打开导航" onclick="document.body.classList.toggle('nav-open')"><i data-lucide="menu"></i></button></header>'''
 
 
 def page(title: str, body: str, active: str = "", query: str = "") -> HTMLResponse:
-    return HTMLResponse(f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="中国前沿科技融资热点研究平台"><link rel="icon" href="/favicon.ico"><title>{esc(title)} · 中国前沿科技融资热点雷达</title><link rel="stylesheet" href="/static/site.css"><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script></head><body>{nav(active,query)}<main>{body}</main><footer><div><b>中国前沿科技融资热点雷达</b><p>公开端仅展示经过双审并进入有效 Release 的唯一融资事件。</p></div><a href="/methodology">数据口径与证据规则</a></footer><script>if(window.lucide)lucide.createIcons();</script></body></html>''')
+    return HTMLResponse(f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="中国前沿科技融资热点研究平台"><link rel="icon" href="/favicon.ico"><title>{esc(title)} · 中国前沿科技融资热点雷达</title><link rel="stylesheet" href="/static/site.css"><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script></head><body>{nav(active,query)}<main>{body}</main><footer><div><b>中国前沿科技融资热点雷达</b><p>V3.0 Release分别展示正式事件、A类候选与B类候选，候选状态不代表人工确认。</p></div><a href="/methodology">数据口径与证据规则</a></footer><script>if(window.lucide)lucide.createIcons();</script></body></html>''')
 
 
 def metric(label: str, icon: str, value: str | None) -> str:
@@ -124,7 +124,32 @@ def event_table(data: dict, filters: PublicFilters) -> str:
     return f'<div class="table-scroll"><table><thead><tr><th>日期</th><th>企业</th><th>赛道</th><th>融资轮次</th><th>融资金额</th><th>投资方</th><th>原始来源</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>{pager}'
 
 
+def v30_event_rows(events: list[dict]) -> str:
+    if not events: return empty_state("暂无关联融资事件", "当前主题尚无已归类记录。")
+    rows = []
+    for event in sorted(events, key=lambda item: item.get("disclosure_date", ""), reverse=True):
+        status = "A类候选" if event["queue_class"] == "A" else "B类待核验"
+        source = f'<a href="{esc(event["source_url"])}" target="_blank" rel="noopener noreferrer">查看原文<i data-lucide="external-link"></i></a>'
+        rows.append(f'<tr><td>{esc(event["disclosure_date"])}</td><td>{esc(event["company_name_standard"])}</td><td>{esc(event["round_original"])}</td><td>{esc(event["amount_original"])}</td><td><span class="status-badge {event["queue_class"].lower()}">{status}</span></td><td>{source}</td></tr>')
+    return f'<div class="table-scroll"><table class="taxonomy-table"><thead><tr><th>披露日期</th><th>企业</th><th>轮次</th><th>金额原文</th><th>审核状态</th><th>来源</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+
+
+def v30_home(overview: dict) -> HTMLResponse:
+    manifest = overview["manifest"]; taxonomy = service.v30_taxonomy(); events = overview["events"]
+    classified_events = [event for event in events if event["classification"].get("primary_topic_id")]
+    counts: dict[str, int] = {}
+    for event in classified_events:
+        key = event["classification"]["primary_industry_id"]
+        counts[key] = counts.get(key, 0) + 1
+    cards = "".join((metric("历史候选记录","database",str(manifest["source_records"])),metric("唯一候选事件","landmark",str(manifest["unique_candidate_events"])),metric("原正式事件","badge-check",str(manifest["formal_events"])),metric("三级候选主题","network",str(manifest["topics"]))))
+    industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · V3.0</span><h1>中国前沿科技融资热点雷达</h1><p>以10个产业方向、38个技术领域和34个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>V3.0 · frozen</dd></div><div><dt>正式/A/B</dt><dd>{manifest["formal_events"]} / {manifest["a_candidates"]} / {manifest["b_candidates"]}</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell"><section class="metrics">{cards}</section><p class="notice"><i data-lucide="info"></i>正式事件、A类候选和B类候选分开统计。候选记录不是人工确认的正式融资事件。</p><section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">LATEST CANDIDATES</span><h2>最新历史候选记录</h2><p>仅展示Release快照中的审核状态</p></div></div>{v30_event_rows(events[:12])}</section></div>'''
+    return page("首页", body, "/")
+
+
 async def home(request: Request) -> HTMLResponse:
+    v30 = service.v30_overview()
+    if v30: return v30_home(v30)
     def page_number(value: str | None) -> int:
         try:
             return max(int(value or "1"), 1)
@@ -168,21 +193,63 @@ async def fields(request: Request):
 
 
 async def field_detail(request: Request):
-    item=next((x for x in FIELDS if x[0]==request.path_params["field_id"]),None)
-    title=item[1] if item else "未知学科"
-    return page(title,f'<div class="page-shell subpage"><a class="back" href="/fields">← 返回六大学科</a><span class="kicker">FIELD DETAIL</span><h1>{esc(title)}</h1><p class="lede">{esc(item[3] if item else "未找到该学科配置")}</p><section class="panel">{empty_state("暂无已发布融资事件","该学科是浏览入口，不是融资发现边界。")}</section></div>',"/fields")
+    data=service.v30_field(request.path_params["field_id"])
+    if data:
+        cards="".join(f'<a class="topic-card" href="/themes/{topic["topic_id"]}"><span>{esc(topic["management_status"])}</span><h3>{esc(topic["name"])}</h3><p>{esc(topic["technical_boundary"])}</p></a>' for topic in data["topics"])
+        return page(data["field"]["name"],f'<div class="page-shell subpage"><a class="back" href="/industries/{data["industry"]["industry_id"]}">← 返回{esc(data["industry"]["name"])}</a><span class="kicker">TECHNOLOGY FIELD</span><h1>{esc(data["field"]["name"])}</h1><p class="lede">三级候选主题保留原始状态，未人工确认的主题不会被描述为正式主题。</p><div class="topic-grid">{cards}</div></div>',"/taxonomy")
+    item=next((x for x in FIELDS if x[0]==request.path_params["field_id"]),None); title=item[1] if item else "未知领域"
+    return page(title,f'<div class="page-shell subpage"><h1>{esc(title)}</h1>{empty_state("未找到该技术领域","请返回分类导航。")}</div>',"/taxonomy")
+
+
+async def taxonomy(request: Request):
+    data=service.v30_taxonomy()
+    cards="".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">{esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(x["industry_id"]==item["industry_id"] for x in data["fields"])}个二级领域</p></a>' for item in data["industries"])
+    return page("产业技术分类",f'<div class="page-shell subpage"><span class="kicker">V3.0 FROZEN TAXONOMY</span><h1>产业技术分类</h1><p class="lede">10个一级产业方向、38个二级技术领域、34个三级候选主题。来源主题身份和历史ID完整保留。</p><div class="field-grid taxonomy-grid">{cards}</div></div>',"/taxonomy")
+
+
+async def industry_detail(request: Request):
+    data=service.v30_industry(request.path_params["industry_id"])
+    if not data: return page("产业方向",f'<div class="page-shell subpage">{empty_state("未找到产业方向","请返回分类导航。")}</div>',"/taxonomy")
+    blocks=[]
+    for field in data["fields"]:
+        topics=[x for x in data["topics"] if x["field_id"]==field["field_id"]]
+        links="".join(f'<a href="/themes/{x["topic_id"]}">{esc(x["name"])}</a>' for x in topics) or '<span class="pending">当前无三级主题</span>'
+        blocks.append(f'<article class="field-block"><a href="/fields/{field["field_id"]}"><h2>{esc(field["name"])}</h2></a><div class="topic-links">{links}</div></article>')
+    return page(data["industry"]["name"],f'<div class="page-shell subpage"><a class="back" href="/taxonomy">← 返回产业技术分类</a><span class="kicker">INDUSTRY DIRECTION</span><h1>{esc(data["industry"]["name"])}</h1><p class="lede">包含{len(data["fields"])}个二级技术领域和{len(data["topics"])}个三级候选主题。</p><div class="field-block-grid">{"".join(blocks)}</div></div>',"/taxonomy")
+
+
+async def theme_detail(request: Request):
+    data=service.v30_topic(request.path_params["topic_id"])
+    if not data: return page("主题详情",f'<div class="page-shell subpage">{empty_state("未找到主题","请返回分类导航。")}</div>',"/taxonomy")
+    topic=data["topic"]; companies="".join(f'<article class="company-card"><h3>{esc(x["name"])}</h3><p>{esc(x["business"])}</p><small>产品：{esc(x["products"])}<br>技术：{esc(x["technologies"])}</small></article>' for x in data["companies"])
+    rounds="、".join(f'{esc(k)} {v}笔' for k,v in data["rounds"].items()) or "暂无"
+    body=f'<div class="page-shell subpage"><a class="back" href="/fields/{data["field"]["field_id"]}">← 返回{esc(data["field"]["name"])}</a><span class="kicker">CANDIDATE TECHNOLOGY THEME</span><h1>{esc(topic["name"])}</h1><p class="lede">{esc(topic["technical_boundary"])}</p><section class="theme-metrics"><div><span>一级产业</span><b>{esc(data["industry"]["name"])}</b></div><div><span>二级领域</span><b>{esc(data["field"]["name"])}</b></div><div><span>关联企业</span><b>{len(data["companies"])}家</b></div><div><span>唯一候选事件</span><b>{len({x["unique_event_id"] for x in data["events"]})}笔</b></div></section><section><div class="section-head"><div><h2>企业技术画像</h2><p>产品和技术字段来自冻结前的清洗建议层</p></div></div><div class="company-grid">{companies or empty_state("暂无企业画像","等待事件完成分类。")}</div></section><section class="panel event-detail"><div class="section-head"><div><h2>融资事件时间线</h2><p>轮次分布：{rounds}</p></div></div>{v30_event_rows(data["events"])}</section><p class="coverage-note">数据更新：{esc(service.v30_release()["created_at"][:10])} · 主题状态：{esc(topic["management_status"])}</p></div>'
+    return page(topic["name"],body,"/taxonomy")
 
 
 async def tracks(request: Request): return listing("融资赛道","FUNDING TRACKS","按已发布唯一事件观察资本进入的技术赛道。","暂无融资赛道数据","/tracks")
 async def track_detail(request: Request): return listing("赛道详情","TRACK DETAIL","赛道指标将在真实主题数据发布后展示。","该赛道尚无已发布数据","/tracks")
 async def emerging(request: Request): return listing("新兴方向","EMERGING SIGNALS","保留无法归入稳定分类的资本信号；本轮仅提供页面框架。","暂无经审核的新兴方向","/emerging")
-async def companies(request: Request): return listing("企业库","COMPANY DIRECTORY","仅展示有效 Release 中出现的已确认企业主体。","暂无已发布企业","/companies")
+async def companies(request: Request):
+    overview=service.v30_overview()
+    if overview:
+        companies={event["company_id"]:event for event in overview["events"] if event.get("company_id")}
+        cards="".join(f'<a class="company-card" href="/companies/{cid}"><h3>{esc(event["company_name_standard"])}</h3><p>{esc(event.get("primary_business") or "业务信息待补充")}</p><small>{"A类候选" if event["queue_class"]=="A" else "B类待核验"}</small></a>' for cid,event in sorted(companies.items(),key=lambda x:x[1]["company_name_standard"]))
+        return page("企业库",f'<div class="page-shell subpage"><span class="kicker">COMPANY DIRECTORY</span><h1>企业库</h1><p class="lede">覆盖V3.0 Release中的候选企业；审核状态不会被隐藏。</p><div class="company-grid">{cards}</div></div>',"/companies")
+    return listing("企业库","COMPANY DIRECTORY","仅展示有效 Release 中的企业。","暂无已发布企业","/companies")
 async def company_detail(request: Request):
-    company=service.company(request.path_params["company_id"])
-    return listing(company["name"] if company else "企业详情","COMPANY DETAIL","企业产品、技术方向和融资时间线。","暂无可公开企业数据","/companies")
+    company=service.v30_company(request.path_params["company_id"])
+    if company:
+        body=f'<div class="page-shell subpage"><a class="back" href="/companies">← 返回企业库</a><span class="kicker">COMPANY DETAIL</span><h1>{esc(company["name"])}</h1><p class="lede">{esc(company["business"])}</p><section class="theme-metrics"><div><span>核心产品</span><b>{esc(company["products"])}</b></div><div><span>核心技术</span><b>{esc(company["technologies"])}</b></div><div><span>融资记录</span><b>{len(company["events"])}笔</b></div></section><section class="panel event-detail">{v30_event_rows(company["events"])}</section></div>'
+        return page(company["name"],body,"/companies")
+    company=service.company(request.path_params["company_id"]); return listing(company["name"] if company else "企业详情","COMPANY DETAIL","企业产品、技术方向和融资时间线。","暂无可公开企业数据","/companies")
 async def investors(request: Request): return listing("投资机构","INVESTOR DIRECTORY","仅统计有效 Release 中去重后的投资机构。","暂无已发布投资机构","/investors")
 async def investor_detail(request: Request): return listing("投资机构详情","INVESTOR DETAIL","投资事件和技术方向将在证据确认后展示。","暂无可公开机构数据","/investors")
-async def events(request: Request): return listing("融资事件","VERIFIED EVENTS","文档数与唯一融资事件数严格分离。","暂无已发布融资事件","/events")
+async def events(request: Request):
+    overview=service.v30_overview()
+    if overview:
+        return page("融资事件",f'<div class="page-shell subpage"><span class="kicker">FUNDING RECORDS</span><h1>融资事件</h1><p class="lede">共{len(overview["events"])}条候选记录；唯一事件与来源记录分别审计，A/B状态明确展示。</p><section class="panel event-detail">{v30_event_rows(overview["events"])}</section></div>',"/events")
+    return listing("融资事件","VERIFIED EVENTS","文档数与唯一融资事件数严格分离。","暂无已发布融资事件","/events")
 async def event_detail(request: Request):
     event=service.event(request.path_params["event_id"])
     return listing(event.get("company_name") if event else "融资事件详情","EVENT DETAIL","金额原文、轮次、投资方与主要证据来源。","该事件不在当前有效 Release 中","/events")
@@ -207,6 +274,6 @@ async def favicon(request: Request):
     return Response(status_code=204)
 
 
-routes=[Route("/",home),Route("/favicon.ico",favicon),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
+routes=[Route("/",home),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
 app=Starlette(debug=False,routes=routes)
 app.mount("/static",StaticFiles(directory=STATIC),name="static")

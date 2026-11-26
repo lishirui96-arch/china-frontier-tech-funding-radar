@@ -16,20 +16,21 @@ from tests.conftest import add_company, add_document, add_event, add_required_ev
 
 
 def test_empty_database_migrates_to_latest(db):
-    assert migrate(db) == 15
+    assert migrate(db) == 16
     with connect(db) as c:
-        assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 15
+        assert c.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 16
 
 
 def test_migration_is_idempotent(db):
     migrate(db); migrate(db)
     with connect(db) as c:
-        assert c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 15
+        assert c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 16
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='source_audit_runs'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v12_funding_candidates'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v13_candidate_quality_audits'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v14_event_units'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v231_topic_admission_reviews'").fetchone()[0] == 1
+        assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v30_taxonomy_versions'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v15_funding_review_queue'").fetchone()[0] == 1
         assert c.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v151_source_scope_checks'").fetchone()[0] == 1
 
@@ -150,6 +151,32 @@ def test_release_is_immutable_and_reproducible(db):
     assert manifest["content_hash"] == release["content_hash"]
     with pytest.raises(sqlite3.IntegrityError), connect(db) as c:
         c.execute("UPDATE releases SET event_count=2 WHERE release_id=?", (rid,))
+
+
+def test_v30_frozen_taxonomy_rejects_direct_changes(db):
+    with connect(db) as c:
+        c.execute("INSERT INTO v30_taxonomy_versions VALUES (?,?,?,?,?,?,?,?)", ("V3.0", "frozen", 16, "test", "tester", now(), now(), "test"))
+        c.execute("INSERT INTO v30_industries VALUES (?,?,?,?,?,?)", ("V3.0", "industry-1", "01", "测试产业", 1, "source"))
+    with pytest.raises(sqlite3.IntegrityError, match="frozen taxonomy"):
+        with connect(db) as c:
+            c.execute("UPDATE v30_industries SET name='已修改' WHERE taxonomy_version='V3.0' AND industry_id='industry-1'")
+    with pytest.raises(sqlite3.IntegrityError, match="frozen taxonomy"):
+        with connect(db) as c:
+            c.execute("DELETE FROM v30_industries WHERE taxonomy_version='V3.0' AND industry_id='industry-1'")
+
+
+def test_v30_release_snapshot_is_immutable(db):
+    manifest = json.dumps({"source_records": 1, "unique_candidate_events": 1}, sort_keys=True)
+    with connect(db) as c:
+        c.execute("INSERT INTO v30_taxonomy_versions VALUES (?,?,?,?,?,?,?,?)", ("V3.0", "frozen", 16, "test", "tester", now(), now(), "test"))
+        c.execute("INSERT INTO v30_releases VALUES (?,?,?,?,?,?,?,?)", ("v30-release", "V3.0", "V3.0", "published", manifest, "hash", "tester", now()))
+        c.execute("INSERT INTO v30_release_records VALUES (?,?,?,?,?)", ("v30-release", "record-1", "{}", "{}", 1))
+    with pytest.raises(sqlite3.IntegrityError, match="V3 release is immutable"):
+        with connect(db) as c:
+            c.execute("UPDATE v30_releases SET content_hash='changed' WHERE release_id='v30-release'")
+    with pytest.raises(sqlite3.IntegrityError, match="V3 release is immutable"):
+        with connect(db) as c:
+            c.execute("DELETE FROM v30_release_records WHERE release_id='v30-release' AND record_id='record-1'")
 
 
 def test_original_research_database_path_is_rejected():

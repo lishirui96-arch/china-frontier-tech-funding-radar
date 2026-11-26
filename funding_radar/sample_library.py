@@ -51,6 +51,76 @@ class SampleLibraryService:
           JOIN v22_topics t ON t.topic_id=r.source_topic_id
           ORDER BY c.display_name,t.candidate_name""")
 
+    def v30_taxonomy(self) -> dict[str, list[dict[str, Any]]]:
+        return {
+            "industries": self.repo.rows("SELECT * FROM v30_industries WHERE taxonomy_version='V3.0' ORDER BY sort_order"),
+            "fields": self.repo.rows("""SELECT f.*,i.name industry_name FROM v30_fields f JOIN v30_industries i
+              ON i.taxonomy_version=f.taxonomy_version AND i.industry_id=f.industry_id
+              WHERE f.taxonomy_version='V3.0' ORDER BY i.sort_order,f.sort_order"""),
+            "topics": self.repo.rows("""SELECT t.*,f.name field_name,i.name industry_name FROM v30_topics t
+              JOIN v30_fields f ON f.taxonomy_version=t.taxonomy_version AND f.field_id=t.field_id
+              JOIN v30_industries i ON i.taxonomy_version=f.taxonomy_version AND i.industry_id=f.industry_id
+              WHERE t.taxonomy_version='V3.0' ORDER BY i.sort_order,f.sort_order,t.name"""),
+            "aliases": self.repo.rows("SELECT * FROM v30_topic_aliases WHERE taxonomy_version='V3.0'"),
+        }
+
+    def v30_migration_records(self, pending_only: bool = False) -> list[dict[str, Any]]:
+        where = "AND c.needs_manual_review=1" if pending_only else ""
+        return self.repo.rows(f"""SELECT h.*,c.primary_industry_id,c.primary_field_id,c.primary_topic_id,
+          c.classification_reason,c.confidence,c.needs_manual_review,c.classification_status,
+          i.name industry_name,f.name field_name,t.name topic_name,
+          GROUP_CONCAT(CASE WHEN rt.link_role='secondary' THEN st.name END,'；') secondary_topics
+          FROM v30_historical_records h JOIN v30_record_classifications c USING(record_id)
+          LEFT JOIN v30_industries i ON i.taxonomy_version=c.taxonomy_version AND i.industry_id=c.primary_industry_id
+          LEFT JOIN v30_fields f ON f.taxonomy_version=c.taxonomy_version AND f.field_id=c.primary_field_id
+          LEFT JOIN v30_topics t ON t.taxonomy_version=c.taxonomy_version AND t.topic_id=c.primary_topic_id
+          LEFT JOIN v30_record_topics rt ON rt.record_id=h.record_id
+          LEFT JOIN v30_topics st ON st.taxonomy_version=rt.taxonomy_version AND st.topic_id=rt.topic_id
+          WHERE 1=1 {where} GROUP BY h.record_id ORDER BY h.disclosure_date DESC,h.company_name_standard""")
+
+    def v30_actions(self) -> list[dict[str, Any]]:
+        return self.repo.rows("SELECT * FROM v30_classification_actions ORDER BY occurred_at DESC")
+
+    def review_v30_classification(self, record_id: str, *, primary_topic_id: str, secondary_topic_ids: list[str],
+                                  decision: str, actor: str, reason: str) -> None:
+        if decision not in {"classify", "hold", "exclude"}: raise ValueError("不支持的分类决定")
+        if not actor.strip() or not reason.strip(): raise ValueError("审核人和理由不能为空")
+        connection = connect(self.path); timestamp = now()
+        try:
+            with connection:
+                before_row = connection.execute("SELECT * FROM v30_record_classifications WHERE record_id=?", (record_id,)).fetchone()
+                if not before_row: raise ValueError("未知历史记录")
+                before = dict(before_row)
+                if decision == "classify":
+                    topic = connection.execute("""SELECT t.topic_id,t.field_id,f.industry_id FROM v30_topics t JOIN v30_fields f
+                      ON f.taxonomy_version=t.taxonomy_version AND f.field_id=t.field_id
+                      WHERE t.taxonomy_version='V3.0' AND t.topic_id=?""", (primary_topic_id,)).fetchone()
+                    if not topic: raise ValueError("请选择有效主主题")
+                    connection.execute("DELETE FROM v30_record_topics WHERE record_id=?", (record_id,))
+                    connection.execute("INSERT INTO v30_record_topics VALUES (?,?,?,?,?,?)", (record_id,"V3.0",primary_topic_id,"primary",reason,"human_confirmed"))
+                    for topic_id in dict.fromkeys(secondary_topic_ids):
+                        if topic_id != primary_topic_id:
+                            connection.execute("INSERT INTO v30_record_topics VALUES (?,?,?,?,?,?)", (record_id,"V3.0",topic_id,"secondary",reason,"human_confirmed"))
+                    connection.execute("""UPDATE v30_record_classifications SET primary_industry_id=?,primary_field_id=?,primary_topic_id=?,
+                      classification_reason=?,confidence='high',needs_manual_review=0,classification_status='human_confirmed',updated_at=?,updated_by=? WHERE record_id=?""",
+                      (topic["industry_id"],topic["field_id"],topic["topic_id"],reason,timestamp,actor.strip(),record_id))
+                else:
+                    connection.execute("""UPDATE v30_record_classifications SET classification_reason=?,needs_manual_review=1,
+                      classification_status=?,updated_at=?,updated_by=? WHERE record_id=?""",
+                      (reason,"held" if decision=="hold" else "excluded",timestamp,actor.strip(),record_id))
+                after = dict(connection.execute("SELECT * FROM v30_record_classifications WHERE record_id=?", (record_id,)).fetchone())
+                connection.execute("INSERT INTO v30_classification_actions VALUES (?,?,?,?,?,?,?,?)",
+                                  (uid(),record_id,decision,actor.strip(),json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,timestamp))
+                connection.execute("INSERT INTO audit_logs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                  (uid(),actor.strip(),"v30_"+decision,"v30_classification",record_id,json.dumps(before,ensure_ascii=False),json.dumps(after,ensure_ascii=False),reason,None,timestamp))
+        finally: connection.close()
+
+    def request_v30_taxonomy_change(self, target_type: str, target_id: str, proposed_name: str, actor: str, reason: str) -> None:
+        if target_type not in {"industry","field","topic"}: raise ValueError("无效分类层级")
+        if not proposed_name.strip() or not actor.strip() or not reason.strip(): raise ValueError("名称、审核人和理由不能为空")
+        self.repo.execute("INSERT INTO v30_taxonomy_change_requests VALUES (?,?,?,?,?,?,?,?,?,?)",
+                          (uid(),"V3.0",target_type,target_id,"rename",json.dumps({"name":proposed_name.strip()},ensure_ascii=False),actor.strip(),reason,"pending",now()))
+
     def source_coverage(self) -> list[dict[str, Any]]:
         return self.repo.rows("""SELECT r.source_name,r.source_column,COUNT(DISTINCT p.page_id) AS pages_traversed,
             SUM(p.article_count) AS articles_seen,

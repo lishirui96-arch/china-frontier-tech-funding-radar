@@ -1,4 +1,5 @@
 from pathlib import Path
+import inspect
 import sys
 
 import streamlit as st
@@ -8,6 +9,26 @@ from funding_radar.migrations import migrate
 from funding_radar.repository import LedgerRepository
 
 st.set_page_config(page_title="融资事件账本 V1", page_icon=":material/receipt_long:", layout="wide")
+
+# Keep navigation compatible with Streamlit releases that predate Page.help.
+if "help" not in inspect.signature(st.Page).parameters:
+    _streamlit_page = st.Page
+
+    def _compatible_page(*args, **kwargs):
+        kwargs.pop("help", None)
+        return _streamlit_page(*args, **kwargs)
+
+    st.Page = _compatible_page
+
+if "alt" not in inspect.signature(st.dataframe).parameters:
+    _streamlit_dataframe = st.dataframe
+
+    def _compatible_dataframe(*args, **kwargs):
+        kwargs.pop("alt", None)
+        return _streamlit_dataframe(*args, **kwargs)
+
+    st.dataframe = _compatible_dataframe
+
 migrate()
 
 def home_page():
@@ -28,15 +49,15 @@ def home_page():
     left, right = st.columns(2)
     with left:
         st.subheader("来源等级分布")
-        st.dataframe(repo.rows("SELECT evidence_default_grade AS 等级, COUNT(*) AS 来源数 FROM sources GROUP BY evidence_default_grade ORDER BY evidence_default_grade"), width="stretch", hide_index=True, alt="来源等级分布")
+        st.dataframe(repo.rows("SELECT evidence_default_grade AS 等级, COUNT(*) AS 来源数 FROM sources GROUP BY evidence_default_grade ORDER BY evidence_default_grade"), width="stretch", hide_index=True)
     with right:
         st.subheader("金额披露类型分布")
-        st.dataframe(repo.rows("SELECT amount_disclosure_type AS 类型, COUNT(*) AS 事件数 FROM funding_events GROUP BY amount_disclosure_type ORDER BY amount_disclosure_type"), width="stretch", hide_index=True, alt="金额披露类型分布")
+        st.dataframe(repo.rows("SELECT amount_disclosure_type AS 类型, COUNT(*) AS 事件数 FROM funding_events GROUP BY amount_disclosure_type ORDER BY amount_disclosure_type"), width="stretch", hide_index=True)
     st.subheader("各来源成功率")
     st.dataframe(repo.rows("""SELECT s.name AS 来源, COUNT(r.discovery_run_id) AS 运行数,
         COALESCE(SUM(r.inserted_count),0) AS 新增文档, COALESCE(SUM(r.failure_count),0) AS 失败数,
         CASE WHEN COALESCE(SUM(r.request_count),0)=0 THEN NULL ELSE ROUND(1.0-(1.0*SUM(r.failure_count)/SUM(r.request_count)),3) END AS 成功率
-        FROM sources s LEFT JOIN discovery_runs r USING(source_id) GROUP BY s.source_id ORDER BY s.name"""), width="stretch", hide_index=True, alt="各来源发现成功率")
+        FROM sources s LEFT JOIN discovery_runs r USING(source_id) GROUP BY s.source_id ORDER BY s.name"""), width="stretch", hide_index=True)
     st.info("请依次完成文档、实体、去重、事件和发布审核。")
 
 page = st.navigation({
@@ -60,6 +81,7 @@ page = st.navigation({
         st.Page("app_pages/21_v22_taxonomy.py", title="V2.2三级分类管理", icon=":material/schema:", help="按10个一级产业、二级领域和三级候选主题管理企业与事件关联。"),
         st.Page("app_pages/22_v23_topic_adjudication.py", title="V2.3主题人工裁决", icon=":material/gavel:", help="审核多企业主题、观察项、合并预览和待拆分主题；所有决定需人工提交。"),
         st.Page("app_pages/23_v231_admission_review.py", title="V2.3.1主题准入审查", icon=":material/fact_check:", help="查看14个拟确认主题的第二轮质量审查、成员证据等级、实体重复和主题交叉建议。"),
+        st.Page("app_pages/24_v30_taxonomy_migration.py", title="V3.0分类与历史迁移", icon=":material/account_tree:", help="管理冻结的10→38→34分类体系，审核97条历史记录归类及关联变更。"),
     ],
     "采集与审核": [
         st.Page("app_pages/00_url_import.py", title="URL 导入", icon=":material/upload_file:"),
