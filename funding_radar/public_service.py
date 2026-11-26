@@ -150,6 +150,10 @@ def aggregate_monthly_capital_flow(
                       "amounts": {code: sum(valid_amount(x) or 0 for x in matches if x.get("amount_currency") == code) for code in trend_currencies}})
     classified = [x for x in current if x.get("primary_industry_id") in industry_names]
     disclosed = [x for x in current if valid_amount(x) is not None]
+    ranged = [x for x in current if not x.get("is_cumulative_amount") and x.get("amount_disclosure_type") in {"bounded_range", "lower_bound", "upper_bound", "order_of_magnitude"}]
+    undisclosed = [x for x in current if x.get("amount_disclosure_type") == "undisclosed"]
+    cumulative = [x for x in current if x.get("is_cumulative_amount")]
+    usd_events = [x for x in current if x.get("amount_currency") == "USD"]
     return {
         "scope": "formal_confirmed_release_only", "month": month, "is_mtd": month == datetime.now(CHINA_TZ).strftime("%Y-%m"),
         "filters": {"currency": currency or None, "industry_id": industry_id or None, "round": round_name or None},
@@ -157,7 +161,9 @@ def aggregate_monthly_capital_flow(
                    "company_count": len({x.get("company_id") for x in current if x.get("company_id")}),
                    "industry_count": len({x.get("primary_industry_id") for x in classified}), "amounts": totals,
                    "amount_disclosure_coverage": len(disclosed) / len(current) if current else 0,
-                   "unclassified_event_count": len(current) - len(classified)},
+                   "unclassified_event_count": len(current) - len(classified),
+                   "range_amount_event_count": len(ranged), "undisclosed_amount_event_count": len(undisclosed),
+                   "cumulative_amount_event_count": len(cumulative), "usd_event_count": len(usd_events)},
         "industries": industry_rows, "rounds": round_rows, "trend": trend,
         "currencies": currencies, "trend_currencies": trend_currencies, "updated_at": updated_at,
         "methodology": ["仅统计人工确认且进入正式Release的唯一事件", "按announcement_date公告日期统计", "当前月为MTD口径",

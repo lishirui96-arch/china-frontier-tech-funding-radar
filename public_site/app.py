@@ -187,7 +187,7 @@ def capital_amount(value: int | float, currency: str) -> str:
     return f"{value:,.0f} {currency}"
 
 
-def capital_flow_module(data: dict, industries: list[dict]) -> str:
+def capital_flow_module(data: dict) -> str:
     totals = data["totals"]
     month_label = f'{data["month"][:4]}年{int(data["month"][5:])}月'
     amounts = totals["amounts"]
@@ -198,23 +198,13 @@ def capital_flow_module(data: dict, industries: list[dict]) -> str:
         metric("涉及企业数", "building-2", f'{totals["company_count"]} 家'),
         metric("覆盖产业领域数", "network", f'{totals["industry_count"]} 个'),
     ))
-    if totals["event_count"] == 0:
-        industry_links = "".join(f'<a href="/events?scope=formal&amp;industry_id={esc(item["industry_id"])}">{esc(item["name"])}</a>' for item in industries)
-        flow = f'{empty_state("正式融资事件确认后，将展示各产业领域的资金流向", "当前没有同时完成人工确认并进入正式Release的事件。")}<div class="empty-industry-links">{industry_links}</div>'
-    else:
-        flow_rows = []
-        for row in data["industries"]:
-            if not row["event_count"]:
-                continue
-            display = " / ".join(capital_amount(value, code) for code, value in row["amounts"].items() if value) or "金额未精确披露"
-            width = max(8, max([share for share in row["shares"].values() if share is not None] or [0]) * 100)
-            flow_rows.append(f'<a class="flow-row" href="/events?scope=formal&amp;industry_id={esc(row["industry_id"])}" title="{esc(display)}｜{row["event_count"]}起｜{row["company_count"]}家"><i style="width:{width:.1f}%"></i><span>{esc(row["industry_name"])}</span><b>{esc(display)}</b></a>')
-        flow = f'<div class="flow-source"><span>本月正式资本</span><b>{esc(amount_summary)}</b></div><div class="flow-routes">{"".join(flow_rows)}</div>'
     ranking_rows = []
     for row in sorted(data["industries"], key=lambda x: (-max([share for share in x["shares"].values() if share is not None] or [0]), x["industry_name"])):
         displays = " / ".join(capital_amount(value, code) for code, value in row["amounts"].items() if value) or "暂无数据"
         shares = " / ".join(f'{value:.1%}' for value in row["shares"].values() if value is not None) or "—"
         ranking_rows.append(f'<a href="/events?scope=formal&amp;industry_id={esc(row["industry_id"])}"><span>{esc(row["industry_name"])}</span><i style="width:{max([x for x in row["shares"].values() if x is not None] or [0]) * 100:.1f}%"></i><b>{esc(displays)}</b><em>{shares} · {row["event_count"]}起</em></a>')
+    disclosed_value = amount_summary if amounts else "—"
+    disclosure = f'''<div class="disclosed-total"><strong>{esc(disclosed_value)}</strong></div><p class="disclosure-note"><i data-lucide="info"></i><span>仅统计可核验的披露金额<br><small>未披露金额、金额区间、累计金额不计入</small></span></p><div class="disclosure-summary"><h4>本月融资数据概览</h4><dl><div><dt>精确披露金额事件</dt><dd>{totals["amount_disclosed_event_count"]} 起</dd></div><div><dt>区间披露金额事件</dt><dd>{totals["range_amount_event_count"]} 起（不计入金额）</dd></div><div><dt>未披露金额事件</dt><dd>{totals["undisclosed_amount_event_count"]} 起</dd></div><div><dt>美元融资事件</dt><dd>{totals["usd_event_count"]} 起（单独统计）</dd></div></dl></div>'''
     trend_max = {code: max((item["amounts"].get(code, 0) for item in data["trend"]), default=0) for code in data["trend_currencies"]}
     trend_columns = []
     for item in data["trend"]:
@@ -238,7 +228,7 @@ def capital_flow_module(data: dict, industries: list[dict]) -> str:
     else:
         ring = empty_state("暂无本月资金结构", "正式事件及精确金额发布后，将按标准化融资轮次展示。")
     mtd = "MTD · 月内累计" if data["is_mtd"] else "自然月统计"
-    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">MONTHLY CAPITAL FLOW</span><h2>本月资本流向概览 <small>（{esc(month_label)}）</small></h2></div></div><p>按公告日期统计 · {mtd} · CNY与USD分币种展示</p></div><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本月暂无人工确认的正式融资事件" if totals["event_count"] == 0 else "仅统计人工确认且进入正式Release的融资事件")}</p><div class="capital-grid"><article class="capital-panel capital-flow"><h3>资本流向：资金由市场流入各产业领域</h3>{flow}</article><article class="capital-panel capital-ranking"><h3>各领域融资规模与占比</h3><div class="ranking-list">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-trend"><h3>近6个月融资趋势</h3><p>柱：已披露精确金额　点上数字：正式事件数</p><div class="capital-trend-chart">{trend}</div></article><article class="capital-panel capital-structure"><h3>本月资金结构（按轮次）</h3>{ring}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></section>'''
+    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">MONTHLY CAPITAL FLOW</span><h2>本月资本流向概览 <small>（{esc(month_label)}）</small></h2></div></div><p>按公告日期统计 · {mtd} · CNY与USD分币种展示</p></div><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本月暂无人工确认的正式融资事件" if totals["event_count"] == 0 else "仅统计人工确认且进入正式Release的融资事件")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资规模与占比</h3><div class="ranking-list">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-trend"><h3>近6个月融资趋势</h3><p>柱：已披露精确金额　点上数字：正式事件数</p><div class="capital-trend-chart">{trend}</div></article><article class="capital-panel capital-structure"><h3>本月资金结构（按轮次）</h3>{ring}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></section>'''
 
 
 def v30_home(overview: dict) -> HTMLResponse:
@@ -251,7 +241,7 @@ def v30_home(overview: dict) -> HTMLResponse:
         counts[key] = counts.get(key, 0) + 1
     industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
     version = manifest.get("taxonomy_version", "V3.0")
-    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{manifest["industries"]}个产业方向、{manifest["fields"]}个技术领域和{manifest["topics"]}个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(capital, taxonomy["industries"])}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{manifest["industries"]}个产业方向、{manifest["fields"]}个技术领域和{manifest["topics"]}个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(capital)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
     return page("首页", body, "/")
 
 

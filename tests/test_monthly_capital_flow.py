@@ -32,6 +32,10 @@ def test_capital_flow_deduplicates_and_keeps_currencies_separate():
     result = aggregate_monthly_capital_flow(rows, INDUSTRIES, "2026-11", updated_at="2026-11-26")
     assert result["totals"]["event_count"] == 5
     assert result["totals"]["amount_disclosed_event_count"] == 2
+    assert result["totals"]["range_amount_event_count"] == 1
+    assert result["totals"]["undisclosed_amount_event_count"] == 1
+    assert result["totals"]["cumulative_amount_event_count"] == 1
+    assert result["totals"]["usd_event_count"] == 1
     assert result["totals"]["amounts"] == {"CNY": 100_000_000, "USD": 20_000_000}
     assert result["totals"]["company_count"] == 5
     assert result["industries"][0]["event_count"] == 4
@@ -83,7 +87,9 @@ def test_public_api_and_home_show_real_empty_state():
     assert len(payload["industries"]) == 10
     home = client.get("/").text
     assert "本月暂无人工确认的正式融资事件" in home
-    assert "资本流向：资金由市场流入各产业领域" in home
+    assert "资本流向：资金由市场流入各产业领域" not in home
+    assert "已披露融资金额" in home
+    assert "区间披露金额事件" in home
     assert "scope=formal" in home
     assert home.index("本月资本流向概览") < home.index("产业技术分类导航")
     formal = client.get("/events?scope=formal&industry_id=robot").text
