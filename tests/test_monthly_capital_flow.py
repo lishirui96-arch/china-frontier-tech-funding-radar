@@ -155,7 +155,9 @@ def test_90_day_period_link_updates_home_record_table_and_classification():
     assert "共382条，其中381条已归入一级分类" in home.text
     assert home.text.count("<tr><td>") == 382
     assert "安柏芮ANDPERIOD" in home.text
-    assert 'href="/?window=90#funding-records"' in home.text
+    assert 'onclick="selectCapitalPeriod(90,this)"' in home.text
+    assert "fetch('/api/funding-records?window='+days)" in home.text
+    assert "history.replaceState(null,'','/?window='+days)" in home.text
 
     events = rolling_window(PublicDataService().historical_candidate_events(), 90,
                             cutoff="2026-11-27")["events"]
@@ -165,6 +167,19 @@ def test_90_day_period_link_updates_home_record_table_and_classification():
         "primary_field_id": "edc8b06e-95f5-5d50-bc86-eaa6c90b8398",
         "primary_topic_id": "16e44396-6f2a-5182-8b1e-f5ea08500c80",
     }
+
+
+def test_funding_records_api_returns_each_window_without_navigation():
+    client = TestClient(app)
+    for days, total, classified in ((30, 117, 117), (90, 382, 381), (360, 1399, 1382)):
+        response = client.get(f"/api/funding-records?window={days}")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["window_days"] == days
+        assert payload["total"] == total
+        assert payload["classified"] == classified
+        assert payload["html"].count("<tr><td>") == total
+    assert client.get("/api/funding-records?window=31").status_code == 422
 
 
 def test_30_day_increment_and_every_bar_drill_down_match():
