@@ -253,6 +253,27 @@ def test_90_day_every_bar_drill_down_matches():
             assert response.text.count("<tr><td>") == industry["event_count"]
 
 
+def test_industry_cards_follow_selected_window_and_link_to_matching_events():
+    service = PublicDataService()
+    client = TestClient(app)
+    home = client.get("/?window=30").text
+    assert "function selectIndustryPeriod(days)" in home
+    assert "button.addEventListener('click',()=>selectIndustryPeriod(button.dataset.period))" in home
+
+    fintech_id = "ff7843c2-7043-5859-bc3a-7d95cc558acf"
+    assert f'data-industry-id="{fintech_id}" data-count-30="0" data-count-90="0" data-count-360="1"' in home
+    assert f'href="/events?industry_id={fintech_id}&amp;window=30"' in home
+
+    for days in (30, 90, 360):
+        window = service.v30_candidate_window(days)
+        for industry in window["industries"]["industries"]:
+            response = client.get("/events?" + urlencode({
+                "industry_id": industry["industry_id"], "window": days,
+            }))
+            assert response.status_code == 200
+            assert response.text.count("<tr><td>") == industry["event_count"]
+
+
 def test_same_company_date_and_source_are_merged_into_one_display_event():
     events = PublicDataService().historical_candidate_events()
     yinuo = [event for event in events if event["company_name_standard"] == "宜诺生物"]

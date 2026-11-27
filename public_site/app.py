@@ -239,6 +239,42 @@ def capital_flow_module(windows: dict[int, dict], selected_days: int) -> str:
     return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">CAPITAL FLOW OVERVIEW</span><h2>资本流向概览</h2></div></div><div class="capital-periods" aria-label="统计周期">{buttons}</div></div>{panes}<script>let capitalRequestId=0;async function selectCapitalPeriod(days,button){{const root=document.getElementById('monthly-capital-flow');root.querySelectorAll('[data-capital-window]').forEach(view=>view.hidden=String(days)!==view.dataset.capitalWindow);root.querySelectorAll('[data-period]').forEach(item=>{{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active)}});const requestId=++capitalRequestId;button.setAttribute('aria-busy','true');try{{const response=await fetch('/api/funding-records?window='+days);if(!response.ok)throw new Error('request failed');const data=await response.json();if(requestId!==capitalRequestId)return;document.getElementById('funding-records-title').textContent='近'+data.window_days+'天融资记录';document.getElementById('funding-records-summary').textContent='共'+data.total+'条，其中'+data.classified+'条已归入一级分类；同一企业、日期和来源的多轮记录合并展示。';document.getElementById('funding-records-table').innerHTML=data.html;history.replaceState(null,'','/?window='+days);if(window.lucide)lucide.createIcons();}}catch(error){{if(requestId===capitalRequestId)document.getElementById('funding-records-summary').textContent='融资记录加载失败，请重试。';}}finally{{button.removeAttribute('aria-busy');}}}}function selectRoundIndustry(key,button){{const root=button.closest('[data-capital-window]');root.querySelectorAll('[data-round-view]').forEach(view=>view.hidden=view.dataset.roundView!==key);root.querySelectorAll('[data-round-key]').forEach(item=>{{const active=item===button;item.classList.toggle('selected',active);item.setAttribute('aria-selected',active)}});}}</script></section>'''
 
 
+def industry_period_cards(taxonomy: dict, windows: dict[int, dict], selected_days: int) -> str:
+    counts = {
+        days: {row["industry_id"]: row["event_count"] for row in window["industries"]["industries"]}
+        for days, window in windows.items()
+    }
+    cards = []
+    for item in taxonomy["industries"]:
+        industry_id = item["industry_id"]
+        fields = [field for field in taxonomy["fields"] if field["industry_id"] == industry_id]
+        field_ids = {field["field_id"] for field in fields}
+        topic_count = sum(topic["field_id"] in field_ids for topic in taxonomy["topics"])
+        count_attrs = " ".join(
+            f'data-count-{days}="{counts[days].get(industry_id, 0)}"' for days in windows
+        )
+        cards.append(
+            f'<a class="field-card" data-industry-card data-industry-id="{esc(industry_id)}" '
+            f'{count_attrs} href="/events?industry_id={esc(industry_id)}&amp;window={selected_days}">'
+            f'<span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3>'
+            f'<p>{len(fields)}个二级领域 · {topic_count}个三级主题</p>'
+            f'<span class="field-count">{counts[selected_days].get(industry_id, 0)}个融资事件</span></a>'
+        )
+    script = '''<script>
+function selectIndustryPeriod(days){
+  document.querySelectorAll('[data-industry-card]').forEach(card=>{
+    const count=card.getAttribute('data-count-'+days)||'0';
+    card.querySelector('.field-count').textContent=count+'个融资事件';
+    card.href='/events?industry_id='+encodeURIComponent(card.dataset.industryId)+'&window='+days;
+  });
+}
+document.querySelectorAll('[data-period]').forEach(button=>
+  button.addEventListener('click',()=>selectIndustryPeriod(button.dataset.period))
+);
+</script>'''
+    return "".join(cards) + script
+
+
 def v30_home(overview: dict, selected_days: int = 30) -> HTMLResponse:
     manifest = overview["manifest"]
     taxonomy = service.v30_taxonomy()
@@ -256,11 +292,7 @@ def v30_home(overview: dict, selected_days: int = 30) -> HTMLResponse:
             "start_date", "end_date", "source_start_date", "source_end_date", "effective_start_date", "coverage_complete"
         )})
     classified_events = [event for event in events if event["classification"].get("primary_industry_id")]
-    counts: dict[str, int] = {}
-    for event in classified_events:
-        key = event["classification"]["primary_industry_id"]
-        counts[key] = counts.get(key, 0) + 1
-    industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
+    industry_cards = industry_period_cards(taxonomy, windows, selected_days)
     version = taxonomy.get("version") or manifest.get("taxonomy_version", "V3.0")
     body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{len(taxonomy["industries"])}个产业方向、{len(taxonomy["fields"])}个技术领域和{len(taxonomy["topics"])}个技术主题组织融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows, selected_days)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级技术主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail" id="funding-records"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2 id="funding-records-title">近{selected_days}天融资记录</h2><p id="funding-records-summary">共{len(events)}条，其中{len(classified_events)}条已归入一级分类；同一企业、日期和来源的多轮记录合并展示。</p></div></div><div id="funding-records-table">{v30_classified_rows(events, taxonomy)}</div></section></div>'''
     return page("首页", body, "/")
