@@ -24,5 +24,5 @@ def test_historical_candidate_window_uses_one_shared_cutoff(db):
     service = PublicDataService(db)
     for days in (30, 90, 360):
         result = service.v30_candidate_window(days)
-        assert result["end_date"] == "2026-11-25"
+        assert result["end_date"] == "2026-11-27"
         assert result["rounds"]["total"] == 0

@@ -103,12 +103,12 @@ def test_public_api_and_home_show_real_empty_state():
     assert "区间披露金额事件" in home
     assert "各领域融资事件次数与占比" in home
     assert "/events?industry_id=" in home
-    assert "候选融资事件数" in home and "113 起" in home
-    assert "涉及企业数（候选）" in home and "113 家" in home
+    assert "候选融资事件数" in home and "117 起" in home
+    assert "涉及企业数（候选）" in home and "117 家" in home
     assert "近30天融资记录" in home
-    assert "共113条，其中113条已归入一级分类" in home
-    assert "恒元光电" in home and "乾原量子" in home and "术加医疗" in home
-    assert home.count("<tr><td>") >= 113
+    assert "共117条，其中117条已归入一级分类" in home
+    assert "英汉思动力" in home and "闪科光联" in home and "华源智因" in home
+    assert home.count("<tr><td>") >= 117
     assert 'href="/companies/repeated"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
     assert "近6个月融资趋势" not in home
@@ -140,19 +140,22 @@ def test_rolling_capital_api_separates_formal_and_candidate_data():
     payload = response.json()
     assert payload["window_days"] == 90
     assert payload["formal_release"]["event_count"] == 0
-    assert payload["candidate_observation"]["industries"]["total"] == 378
+    assert payload["candidate_observation"]["industries"]["total"] == 382
     assert payload["date_range"]["coverage_complete"] is True
     assert client.get("/api/capital-flow?window=31").status_code == 422
 
 
-def test_30_day_additions_and_every_bar_drill_down_match():
+def test_30_day_increment_and_every_bar_drill_down_match():
     service = PublicDataService()
-    events = rolling_window(service.historical_candidate_events(), 30, cutoff="2026-11-25")["events"]
-    additions = [event for event in events if event["disclosure_date"] <= "2026-11-01"]
-    assert len(events) == 113 and len(additions) == 18
-    assert {event["company_name_standard"] for event in additions} >= {
-        "乾原量子", "恒元光电", "百世达", "脑虎科技", "宜诺生物", "天嗅智能", "术加医疗"
+    events = rolling_window(service.historical_candidate_events(), 30, cutoff="2026-11-27")["events"]
+    additions = [event for event in events if event["disclosure_date"] >= "2026-11-26"]
+    assert len(events) == 117 and len(additions) == 12
+    assert {event["company_name_standard"] for event in additions} == {
+        "英汉思动力", "博登智能", "零次方机器人", "粒影生物", "时空智子", "向量奇点",
+        "环码生物", "迈塔兰斯", "华辰芯光", "华源智因", "HearWell", "闪科光联",
     }
+    shanke = next(event for event in additions if event["company_name_standard"] == "闪科光联")
+    assert shanke["round_original"] == "种子轮 / 天使轮" and shanke["merged_record_count"] == 2
 
     client = TestClient(app)
     window = service.v30_candidate_window(30)

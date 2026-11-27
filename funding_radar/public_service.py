@@ -630,7 +630,7 @@ class PublicDataService:
 
     def v30_candidate_window(self, days: int) -> dict[str, Any]:
         taxonomy = self.v30_taxonomy()
-        window = rolling_window(self.historical_candidate_events(), days, cutoff="2026-11-25")
+        window = rolling_window(self.historical_candidate_events(), days, cutoff="2026-11-27")
         events = window.pop("events")
         return {
             **window,
