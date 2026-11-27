@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -180,6 +180,36 @@ def candidate_round_bucket(value: object) -> str:
     if re.search(r"(?:pre[- ]?[ab]|[ab](?:\+{1,2}|\d)?)(?:轮)?", normalized):
         return "vc"
     return "other"
+
+
+def rolling_window(events: list[dict[str, Any]], days: int, *, cutoff: str | None = None) -> dict[str, Any]:
+    """Filter unique events to an inclusive rolling window based on disclosure date."""
+    if days not in {30, 90, 360}:
+        raise ValueError("window must be one of 30, 90, 360")
+    dated: list[tuple[date, dict[str, Any]]] = []
+    for event in events:
+        raw = str(event.get("announcement_date") or event.get("disclosure_date") or "")
+        if not DATE_ONLY.fullmatch(raw):
+            continue
+        dated.append((date.fromisoformat(raw), event))
+    end = date.fromisoformat(cutoff) if cutoff else max((item[0] for item in dated), default=date.today())
+    start = end - timedelta(days=days - 1)
+    unique: dict[str, dict[str, Any]] = {}
+    for event_date, event in dated:
+        key = str(event.get("record_id") or event.get("unique_event_id") or event.get("event_id") or "")
+        if key and start <= event_date <= end and key not in unique:
+            unique[key] = event
+    source_start = min((item[0] for item in dated), default=None)
+    source_end = max((item[0] for item in dated), default=None)
+    effective_start = max(start, source_start) if source_start else None
+    complete = bool(source_start and source_start <= start)
+    return {
+        "days": days, "start_date": start.isoformat(), "end_date": end.isoformat(),
+        "events": list(unique.values()), "source_start_date": source_start.isoformat() if source_start else None,
+        "source_end_date": source_end.isoformat() if source_end else None,
+        "effective_start_date": effective_start.isoformat() if effective_start else None,
+        "coverage_complete": complete,
+    }
 
 
 def candidate_round_structure(events: list[dict[str, Any]], industries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -469,6 +499,48 @@ class PublicDataService:
         overview = self.v30_overview()
         taxonomy = self.v30_taxonomy()
         return candidate_industry_structure((overview or {}).get("events", []), taxonomy["industries"])
+
+    def v30_candidate_window(self, days: int) -> dict[str, Any]:
+        overview = self.v30_overview()
+        taxonomy = self.v30_taxonomy()
+        window = rolling_window((overview or {}).get("events", []), days)
+        events = window.pop("events")
+        return {
+            **window,
+            "rounds": candidate_round_structure(events, taxonomy["industries"]),
+            "industries": candidate_industry_structure(events, taxonomy["industries"]),
+        }
+
+    def formal_capital_window(self, days: int, *, cutoff: str) -> dict[str, Any]:
+        events, updated_at = self._strict_formal_events()
+        window = rolling_window(events, days, cutoff=cutoff)
+        selected = window.pop("events")
+
+        def valid_amount(item: dict[str, Any]) -> int | float | None:
+            value = item.get("amount_exact")
+            if item.get("is_cumulative_amount") or item.get("amount_disclosure_type") != "exact":
+                return None
+            return value if isinstance(value, (int, float)) else None
+
+        amounts: dict[str, int | float] = {}
+        for event in selected:
+            value = valid_amount(event)
+            currency = str(event.get("amount_currency") or "")
+            if value is not None and currency:
+                amounts[currency] = amounts.get(currency, 0) + value
+        disclosed = [event for event in selected if valid_amount(event) is not None]
+        ranged = [event for event in selected if not event.get("is_cumulative_amount") and event.get("amount_disclosure_type") in {"bounded_range", "lower_bound", "upper_bound", "order_of_magnitude"}]
+        undisclosed = [event for event in selected if event.get("amount_disclosure_type") == "undisclosed"]
+        return {
+            **window, "updated_at": updated_at,
+            "totals": {
+                "event_count": len(selected), "company_count": len({event.get("company_id") for event in selected if event.get("company_id")}),
+                "industry_count": len({event.get("primary_industry_id") for event in selected if event.get("primary_industry_id")}),
+                "amounts": amounts, "amount_disclosed_event_count": len(disclosed),
+                "range_amount_event_count": len(ranged), "undisclosed_amount_event_count": len(undisclosed),
+                "usd_event_count": sum(event.get("amount_currency") == "USD" for event in selected),
+            },
+        }
 
     def v30_repeated_candidate_companies(self) -> list[dict[str, Any]]:
         overview = self.v30_overview()

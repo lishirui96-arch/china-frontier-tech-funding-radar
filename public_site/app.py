@@ -11,7 +11,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 from starlette.staticfiles import StaticFiles
 
-from funding_radar.public_service import PublicDataService, PublicFilters, candidate_round_bucket
+from funding_radar.public_service import PublicDataService, PublicFilters, candidate_round_bucket, rolling_window
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -188,13 +188,12 @@ def capital_amount(value: int | float, currency: str) -> str:
     return f"{value:,.0f} {currency}"
 
 
-def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries: dict) -> str:
+def capital_flow_window(data: dict, candidate_rounds: dict, candidate_industries: dict, days: int) -> str:
     totals = data["totals"]
-    month_label = f'{data["month"][:4]}年{int(data["month"][5:])}月'
     amounts = totals["amounts"]
     amount_summary = " / ".join(capital_amount(value, code) for code, value in amounts.items()) or "暂无可统计金额"
     cards = "".join((
-        metric("本月融资总额", "coins", amount_summary),
+        metric("已披露融资金额", "coins", amount_summary),
         metric("候选融资事件数", "layers-3", f'{candidate_industries["total"]} 起'),
         metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家', "/companies/repeated"),
         metric("覆盖产业领域数（候选）", "network", f'{candidate_industries["industry_count"]} 个'),
@@ -203,9 +202,9 @@ def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries
     ranking_max = max((row["event_count"] for row in candidate_industries["industries"]), default=0)
     for index, row in enumerate(candidate_industries["industries"]):
         width = row["event_count"] / ranking_max * 100 if ranking_max else 0
-        ranking_rows.append(f'<a href="/events?industry_id={esc(row["industry_id"])}"><span>{esc(row["industry_name"])}</span><i class="candidate-industry-bar"><u style="width:{width:.1f}%"></u></i><b>{row["event_count"]} 起</b><em>{row["share"]:.1%}</em></a>')
+        ranking_rows.append(f'<a href="/events?industry_id={esc(row["industry_id"])}&amp;window={days}"><span>{esc(row["industry_name"])}</span><i class="candidate-industry-bar"><u style="width:{width:.1f}%"></u></i><b>{row["event_count"]} 起</b><em>{row["share"]:.1%}</em></a>')
     disclosed_value = amount_summary if amounts else "—"
-    disclosure = f'''<div class="disclosed-total"><strong>{esc(disclosed_value)}</strong></div><p class="disclosure-note"><i data-lucide="info"></i><span>仅统计可核验的披露金额<br><small>未披露金额、金额区间、累计金额不计入</small></span></p><div class="disclosure-summary"><h4>本月融资数据概览</h4><dl><div><dt>精确披露金额事件</dt><dd>{totals["amount_disclosed_event_count"]} 起</dd></div><div><dt>区间披露金额事件</dt><dd>{totals["range_amount_event_count"]} 起（不计入金额）</dd></div><div><dt>未披露金额事件</dt><dd>{totals["undisclosed_amount_event_count"]} 起</dd></div><div><dt>美元融资事件</dt><dd>{totals["usd_event_count"]} 起（单独统计）</dd></div></dl></div>'''
+    disclosure = f'''<div class="disclosed-total"><strong>{esc(disclosed_value)}</strong></div><p class="disclosure-note"><i data-lucide="info"></i><span>仅统计可核验的披露金额<br><small>未披露金额、金额区间、累计金额不计入</small></span></p><div class="disclosure-summary"><h4>本周期融资数据概览</h4><dl><div><dt>精确披露金额事件</dt><dd>{totals["amount_disclosed_event_count"]} 起</dd></div><div><dt>区间披露金额事件</dt><dd>{totals["range_amount_event_count"]} 起（不计入金额）</dd></div><div><dt>未披露金额事件</dt><dd>{totals["undisclosed_amount_event_count"]} 起</dd></div><div><dt>美元融资事件</dt><dd>{totals["usd_event_count"]} 起（单独统计）</dd></div></dl></div>'''
     palette = ("#1267dc", "#5caef2", "#8a79e8", "#cbd5e3")
     offset = 0.0; stops = []; round_rows = []; distribution_views = []
     for index, row in enumerate(candidate_rounds["groups"]):
@@ -216,21 +215,34 @@ def capital_flow_module(data: dict, candidate_rounds: dict, candidate_industries
         selected = " selected" if index == 0 else ""
         round_rows.append(f'<li><button type="button" class="round-selector{selected}" data-round-key="{esc(row["key"])}" aria-selected="{str(index == 0).lower()}" onclick="selectRoundIndustry(\'{esc(row["key"])}\',this)"><i style="background:{color}"></i><span>{esc(row["label"])}</span><b>{row["count"]}</b><em>{row["share"]:.1%}</em></button></li>')
         industry_max = max((item["event_count"] for item in row["industries"]), default=0)
-        industry_bars = "".join(f'<a class="round-industry-row" href="/events?industry_id={esc(item["industry_id"])}&amp;round_group={esc(row["key"])}" title="查看{esc(row["label"])} · {esc(item["industry_name"])}融资事件"><span>{esc(item["industry_name"])}</span><i><u style="width:{(item["event_count"] / industry_max * 100) if industry_max else 0:.1f}%"></u></i><b>{item["event_count"]} 起</b><em>{item["share"]:.1%}</em></a>' for item in row["industries"])
-        empty = empty_state("暂无该轮次候选事件", "当前95个有效候选事件中没有这一轮次分组。") if not industry_bars else ""
+        industry_bars = "".join(f'<a class="round-industry-row" href="/events?industry_id={esc(item["industry_id"])}&amp;round_group={esc(row["key"])}&amp;window={days}" title="查看{esc(row["label"])} · {esc(item["industry_name"])}融资事件"><span>{esc(item["industry_name"])}</span><i><u style="width:{(item["event_count"] / industry_max * 100) if industry_max else 0:.1f}%"></u></i><b>{item["event_count"]} 起</b><em>{item["share"]:.1%}</em></a>' for item in row["industries"])
+        empty = empty_state("暂无该轮次候选事件", f"近{days}天窗口内没有这一轮次分组。") if not industry_bars else ""
         distribution_views.append(f'''<div class="round-industry-view" data-round-view="{esc(row["key"])}" {"" if index == 0 else "hidden"}><h3>{esc(row["label"])} 产业领域分布</h3><div class="round-summary"><div><i data-lucide="layers-3"></i><span>融资事件数<b>{row["count"]} 起</b></span></div><div><i data-lucide="building-2"></i><span>涉及企业<b>{row["company_count"]} 家</b></span></div><div><i data-lucide="network"></i><span>覆盖领域<b>{row["industry_count"]} 个</b></span></div><div><i data-lucide="pie-chart"></i><span>占全部候选样本<b>{row["share"]:.1%}</b></span></div></div><div class="round-industry-head"><span>产业领域（一级）</span><b>融资事件数</b><em>占比</em></div><div class="round-industry-bars">{industry_bars or empty}</div></div>''')
     donut_background = f'conic-gradient({",".join(stops)})' if stops else '#e4ebf4'
     ring = f'<div class="candidate-donut" style="--donut:{donut_background}"><span><b>{candidate_rounds["total"]}起</b><small>候选融资数量</small></span></div><div class="candidate-round-table"><div class="candidate-round-head"><span>轮次</span><b>数量</b><em>占比</em></div><ul class="round-list">{"".join(round_rows)}</ul></div><p class="candidate-scope-note">A类{candidate_rounds["queue_counts"].get("A",0)}条 · B类{candidate_rounds["queue_counts"].get("B",0)}条候选观察样本<br>{esc(candidate_rounds["note"])}</p>'
     distribution = "".join(distribution_views)
-    mtd = "MTD · 月内累计" if data["is_mtd"] else "自然月统计"
-    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">MONTHLY CAPITAL FLOW</span><h2>本月资本流向概览 <small>（{esc(month_label)}）</small></h2></div></div><p>按公告日期统计 · {mtd} · CNY与USD分币种展示</p></div><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本月暂无人工确认的正式融资事件" if totals["event_count"] == 0 else "仅统计人工确认且进入正式Release的融资事件")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资事件次数与占比 <small>{candidate_industries["total"]}条候选观察样本</small></h3><div class="ranking-list candidate-industry-ranking">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-structure"><h3>本月资金结构（按轮次） <small>{candidate_rounds["total"]}条候选观察样本</small></h3>{ring}</article><article class="capital-panel round-industry-panel">{distribution}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p><script>function selectRoundIndustry(key,button){{const root=document.getElementById('monthly-capital-flow');root.querySelectorAll('[data-round-view]').forEach(view=>view.hidden=view.dataset.roundView!==key);root.querySelectorAll('[data-round-key]').forEach(item=>{{const active=item===button;item.classList.toggle('selected',active);item.setAttribute('aria-selected',active)}});}}</script></section>'''
+    coverage = (f'数据完整覆盖所选窗口' if data["coverage_complete"] else f'历史数据仅覆盖 {data["effective_start_date"]} 至 {data["source_end_date"]}，不代表完整近{days}天市场')
+    return f'''<div class="capital-window" data-capital-window="{days}" {"" if days == 30 else "hidden"}><p class="capital-range">按公告日期统计 · 滚动{days}天 · 统计区间：{data["start_date"]} 至 {data["end_date"]} · {esc(coverage)}</p><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本周期暂无人工确认的正式融资事件；下方为A/B类候选观察样本" if totals["event_count"] == 0 else "正式事件与候选观察样本分开展示")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资事件次数与占比 <small>{candidate_industries["total"]}条候选观察样本（近{days}天）</small></h3><div class="ranking-list candidate-industry-ranking">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（正式Release辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-structure"><h3>资金结构（按轮次） <small>{candidate_rounds["total"]}条候选观察样本</small></h3>{ring}</article><article class="capital-panel round-industry-panel">{distribution}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></div>'''
+
+
+def capital_flow_module(windows: dict[int, dict]) -> str:
+    panes = "".join(capital_flow_window(item["formal"], item["rounds"], item["industries"], days) for days, item in windows.items())
+    buttons = "".join(f'<button type="button" class="capital-period{(" active" if days == 30 else "")}" data-period="{days}" aria-pressed="{str(days == 30).lower()}" onclick="selectCapitalPeriod({days},this)">近{days}天</button>' for days in windows)
+    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">CAPITAL FLOW OVERVIEW</span><h2>资本流向概览</h2></div></div><div class="capital-periods" aria-label="统计周期">{buttons}</div></div>{panes}<script>function selectCapitalPeriod(days,button){{const root=document.getElementById('monthly-capital-flow');root.querySelectorAll('[data-capital-window]').forEach(view=>view.hidden=String(days)!==view.dataset.capitalWindow);root.querySelectorAll('[data-period]').forEach(item=>{{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active)}});if(window.lucide)lucide.createIcons();}}function selectRoundIndustry(key,button){{const root=button.closest('[data-capital-window]');root.querySelectorAll('[data-round-view]').forEach(view=>view.hidden=view.dataset.roundView!==key);root.querySelectorAll('[data-round-key]').forEach(item=>{{const active=item===button;item.classList.toggle('selected',active);item.setAttribute('aria-selected',active)}});}}</script></section>'''
 
 
 def v30_home(overview: dict) -> HTMLResponse:
     manifest = overview["manifest"]; taxonomy = service.v30_taxonomy(); events = overview["events"]
-    capital = service.formal_monthly_capital_flow()
-    candidate_rounds = service.v30_candidate_round_structure()
-    candidate_industries = service.v30_candidate_industry_structure()
+    windows = {}
+    for days in (30, 90, 360):
+        candidate = service.v30_candidate_window(days)
+        windows[days] = {
+            "formal": service.formal_capital_window(days, cutoff=candidate["end_date"]),
+            "rounds": candidate["rounds"], "industries": candidate["industries"],
+        }
+        windows[days]["formal"].update({key: candidate[key] for key in (
+            "start_date", "end_date", "source_start_date", "source_end_date", "effective_start_date", "coverage_complete"
+        )})
     classified_events = [event for event in events if event["classification"].get("primary_industry_id")]
     counts: dict[str, int] = {}
     for event in classified_events:
@@ -238,7 +250,7 @@ def v30_home(overview: dict) -> HTMLResponse:
         counts[key] = counts.get(key, 0) + 1
     industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
     version = manifest.get("taxonomy_version", "V3.0")
-    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{manifest["industries"]}个产业方向、{manifest["fields"]}个技术领域和{manifest["topics"]}个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(capital,candidate_rounds,candidate_industries)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{manifest["industries"]}个产业方向、{manifest["fields"]}个技术领域和{manifest["topics"]}个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
     return page("首页", body, "/")
 
 
@@ -367,12 +379,17 @@ async def events(request: Request):
         round_group=request.query_params.get("round_group","")
         valid_round_groups={"vc":"VC（Pre-A–B++）","early":"早期（种子/天使）","strategic":"战略投资 / 并购","other":"其他"}
         if round_group not in valid_round_groups: round_group=""
-        rows=[event for event in overview["events"] if (not industry_id or event["classification"].get("primary_industry_id")==industry_id) and (not round_group or candidate_round_bucket(event.get("round_original"))==round_group)]
+        try: window_days=int(request.query_params.get("window", "0"))
+        except ValueError: window_days=0
+        if window_days not in {30,90,360}: window_days=0
+        window_events=rolling_window(overview["events"], window_days)["events"] if window_days else overview["events"]
+        rows=[event for event in window_events if (not industry_id or event["classification"].get("primary_industry_id")==industry_id) and (not round_group or candidate_round_bucket(event.get("round_original"))==round_group)]
         classified=sum(event["classification"].get("primary_industry_id") is not None for event in rows)
         industry=next((x for x in taxonomy["industries"] if x["industry_id"]==industry_id),None)
         label=f' · {industry["name"]}' if industry else ""
         round_label=f' · {valid_round_groups[round_group]}' if round_group else ""
-        return page("融资事件",f'<div class="page-shell subpage"><a class="back" href="/">← 返回首页资本流向</a><span class="kicker">FUNDING RECORDS</span><h1>融资事件{esc(label)}{esc(round_label)}</h1><p class="lede">共{len(rows)}条，其中{classified}条已归入一级分类；企业下方展示主营业务画像。</p><section class="panel event-detail">{v30_classified_rows(rows,taxonomy)}</section></div>',"/events")
+        window_label=f' · 近{window_days}天' if window_days else ""
+        return page("融资事件",f'<div class="page-shell subpage"><a class="back" href="/">← 返回首页资本流向</a><span class="kicker">FUNDING RECORDS</span><h1>融资事件{esc(label)}{esc(round_label)}{esc(window_label)}</h1><p class="lede">共{len(rows)}条，其中{classified}条已归入一级分类；企业下方展示主营业务画像。</p><section class="panel event-detail">{v30_classified_rows(rows,taxonomy)}</section></div>',"/events")
     return listing("融资事件","VERIFIED EVENTS","文档数与唯一融资事件数严格分离。","暂无已发布融资事件","/events")
 async def event_detail(request: Request):
     event=service.event(request.path_params["event_id"])
@@ -411,6 +428,22 @@ async def monthly_capital_flow_api(request: Request):
     return JSONResponse(data, headers={"Cache-Control":"public, max-age=300"})
 
 
-routes=[Route("/",home),Route("/api/monthly-capital-flow",monthly_capital_flow_api),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/repeated",repeated_companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
+async def capital_window_api(request: Request):
+    try:
+        days=int(request.query_params.get("window", "30"))
+        candidate=service.v30_candidate_window(days)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=422)
+    formal=service.formal_capital_window(days, cutoff=candidate["end_date"])
+    return JSONResponse({
+        "window_days": days,
+        "date_range": {key: candidate[key] for key in ("start_date", "end_date", "effective_start_date", "source_start_date", "source_end_date", "coverage_complete")},
+        "formal_release": formal["totals"],
+        "candidate_observation": {"industries": candidate["industries"], "rounds": candidate["rounds"]},
+        "methodology": "按公告日期和稳定事件ID去重；正式Release与A/B候选观察样本分开统计",
+    }, headers={"Cache-Control":"public, max-age=300"})
+
+
+routes=[Route("/",home),Route("/api/monthly-capital-flow",monthly_capital_flow_api),Route("/api/capital-flow",capital_window_api),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/repeated",repeated_companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
 app=Starlette(debug=False,routes=routes)
 app.mount("/static",StaticFiles(directory=STATIC),name="static")

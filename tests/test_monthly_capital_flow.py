@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from starlette.testclient import TestClient
 
-from funding_radar.public_service import PublicDataService, PublicRelease, aggregate_monthly_capital_flow
+from funding_radar.public_service import PublicDataService, PublicRelease, aggregate_monthly_capital_flow, rolling_window
 from public_site.app import app
 
 
@@ -51,6 +51,15 @@ def test_filters_apply_before_monthly_aggregation():
     assert result["totals"]["amounts"] == {"USD": 10}
 
 
+def test_rolling_windows_are_inclusive_and_deduplicate_events():
+    rows = [funding("one", date="2026-11-25"), funding("one", date="2026-11-25"),
+            funding("edge", date="2026-10-27"), funding("old", date="2026-10-26")]
+    result = rolling_window(rows, 30)
+    assert result["start_date"] == "2026-10-27"
+    assert result["end_date"] == "2026-11-25"
+    assert {row["event_id"] for row in result["events"]} == {"one", "edge"}
+
+
 class GateService(PublicDataService):
     def current_release(self):
         return PublicRelease("release", "R", "2026-11-26T00:00:00+08:00", "hash", (
@@ -86,7 +95,7 @@ def test_public_api_and_home_show_real_empty_state():
     assert payload["totals"]["amounts"] == {}
     assert len(payload["industries"]) == 10
     home = client.get("/").text
-    assert "本月暂无人工确认的正式融资事件" in home
+    assert "本周期暂无人工确认的正式融资事件" in home
     assert "资本流向：资金由市场流入各产业领域" not in home
     assert "已披露融资金额" in home
     assert "区间披露金额事件" in home
@@ -104,7 +113,10 @@ def test_public_api_and_home_show_real_empty_state():
     assert repeated.status_code == 200
     assert "谱星航天" in repeated.text and "已合并重复来源" in repeated.text
     assert "蓝固新能源" in repeated.text and "保留1个事件" in repeated.text
-    assert home.index("本月资本流向概览") < home.index("产业技术分类导航")
+    assert 'data-period="30"' in home and 'data-period="90"' in home and 'data-period="360"' in home
+    assert "历史数据仅覆盖 2026-11-02 至 2026-11-25" in home
+    assert "window=30" in home and "window=90" in home and "window=360" in home
+    assert home.index("资本流向概览") < home.index("产业技术分类导航")
     formal = client.get("/events?scope=formal&industry_id=robot").text
     assert "暂无人工确认的正式融资事件" in formal
     assert "共97条" not in formal
@@ -113,3 +125,15 @@ def test_public_api_and_home_show_real_empty_state():
 def test_api_rejects_invalid_month():
     response = TestClient(app).get("/api/monthly-capital-flow?month=2026-13")
     assert response.status_code == 422
+
+
+def test_rolling_capital_api_separates_formal_and_candidate_data():
+    client = TestClient(app)
+    response = client.get("/api/capital-flow?window=90")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["window_days"] == 90
+    assert payload["formal_release"]["event_count"] == 0
+    assert payload["candidate_observation"]["industries"]["total"] == 95
+    assert payload["date_range"]["coverage_complete"] is False
+    assert client.get("/api/capital-flow?window=31").status_code == 422
