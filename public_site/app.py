@@ -249,8 +249,8 @@ def v30_home(overview: dict) -> HTMLResponse:
         key = event["classification"]["primary_industry_id"]
         counts[key] = counts.get(key, 0) + 1
     industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
-    version = manifest.get("taxonomy_version", "V3.0")
-    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{manifest["industries"]}个产业方向、{manifest["fields"]}个技术领域和{manifest["topics"]}个候选主题组织2026年11月1日至25日融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级候选主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
+    version = taxonomy.get("version") or manifest.get("taxonomy_version", "V3.0")
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{len(taxonomy["industries"])}个产业方向、{len(taxonomy["fields"])}个技术领域和{len(taxonomy["topics"])}个技术主题组织融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级技术主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
     return page("首页", body, "/")
 
 
@@ -310,9 +310,8 @@ async def field_detail(request: Request):
 
 async def taxonomy(request: Request):
     data=service.v30_taxonomy()
-    release=service.v30_release(); manifest=json.loads(release["manifest_json"]) if release else {}
     cards="".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">{esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(x["industry_id"]==item["industry_id"] for x in data["fields"])}个二级领域</p></a>' for item in data["industries"])
-    return page("产业技术分类",f'<div class="page-shell subpage"><span class="kicker">{esc(manifest.get("taxonomy_version","V3"))} FROZEN TAXONOMY</span><h1>产业技术分类</h1><p class="lede">{len(data["industries"])}个一级产业方向、{len(data["fields"])}个二级技术领域、{len(data["topics"])}个三级候选主题。来源主题身份和历史ID完整保留。</p><div class="field-grid taxonomy-grid">{cards}</div></div>',"/taxonomy")
+    return page("产业技术分类",f'<div class="page-shell subpage"><span class="kicker">{esc(data.get("version") or "V3")} FROZEN TAXONOMY</span><h1>产业技术分类</h1><p class="lede">{len(data["industries"])}个一级产业方向、{len(data["fields"])}个二级技术领域、{len(data["topics"])}个三级技术主题。来源主题身份和历史ID完整保留。</p><div class="field-grid taxonomy-grid">{cards}</div></div>',"/taxonomy")
 
 
 async def industry_detail(request: Request):

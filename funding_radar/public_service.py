@@ -384,11 +384,28 @@ class PublicDataService:
             manifest["b_candidates"] = sum(event.get("queue_class") == "B" for event in events)
         return {"release": release, "manifest": manifest, "events": events}
 
-    def v30_taxonomy(self) -> dict[str, list[dict[str, Any]]]:
+    def v30_taxonomy(self) -> dict[str, Any]:
+        settings = self._rows(
+            "SELECT taxonomy_version FROM v37_taxonomy_settings WHERE setting_key='current_taxonomy'"
+        ) if self._rows("SELECT name FROM sqlite_master WHERE type='table' AND name='v37_taxonomy_settings'") else []
+        if settings:
+            version = settings[0]["taxonomy_version"]
+            return {
+                "version": version,
+                "industries": self._rows(
+                    "SELECT * FROM v30_industries WHERE taxonomy_version=? ORDER BY sort_order", (version,)
+                ),
+                "fields": self._rows(
+                    "SELECT * FROM v30_fields WHERE taxonomy_version=? ORDER BY industry_id,sort_order", (version,)
+                ),
+                "topics": self._rows(
+                    "SELECT * FROM v30_topics WHERE taxonomy_version=? ORDER BY field_id,name", (version,)
+                ),
+            }
         release = self.v30_release()
-        if not release: return {"industries": [], "fields": [], "topics": []}
+        if not release: return {"version": None, "industries": [], "fields": [], "topics": []}
         rows = self._rows("SELECT entity_type,snapshot_json FROM v30_release_taxonomy WHERE release_id=? ORDER BY position", (release["release_id"],))
-        result = {"industries": [], "fields": [], "topics": []}
+        result = {"version": release["taxonomy_version"], "industries": [], "fields": [], "topics": []}
         names = {"industry": "industries", "field": "fields", "topic": "topics"}
         for row in rows: result[names[row["entity_type"]]].append(json.loads(row["snapshot_json"]))
         return result
@@ -500,10 +517,54 @@ class PublicDataService:
         taxonomy = self.v30_taxonomy()
         return candidate_industry_structure((overview or {}).get("events", []), taxonomy["industries"])
 
+    def historical_candidate_events(self) -> list[dict[str, Any]]:
+        has_v37 = bool(self._rows(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='v37_candidate_classifications'"
+        ))
+        v37_columns = (
+            "COALESCE(v.suggested_industry_id,p.existing_industry_id) primary_industry_id,"
+            "COALESCE(v.suggested_field_id,p.existing_field_id) primary_field_id,"
+            "COALESCE(v.suggested_topic_id,p.existing_topic_id) primary_topic_id"
+        ) if has_v37 else (
+            "p.existing_industry_id primary_industry_id,p.existing_field_id primary_field_id,"
+            "p.existing_topic_id primary_topic_id"
+        )
+        v37_join = (
+            "LEFT JOIN v37_candidate_classifications v "
+            "ON v.candidate_id=c.candidate_id AND v.taxonomy_version='V3.7' "
+            "AND v.review_status='pending_approval'"
+        ) if has_v37 else ""
+        candidates = self._rows(
+            f"""SELECT c.stable_event_id unique_event_id,c.stable_event_id record_id,
+                      c.company_name company_id,c.company_name company_name_standard,c.announcement_date,c.round_original,
+                      c.round_bucket,c.review_status,c.primary_business,c.core_technology,
+                      {v37_columns}
+               FROM v35_historical_candidates c
+               LEFT JOIN v35_classification_proposals p ON p.candidate_id=c.candidate_id
+               {v37_join}
+               WHERE c.review_status IN ('pending','needs_verification')"""
+        )
+        legacy = self._rows(
+            """SELECT e.cluster_id unique_event_id,e.cluster_id record_id,
+                      h.company_name_standard company_id,h.company_name_standard,h.disclosure_date announcement_date,h.round_original,
+                      h.queue_class,rc.primary_industry_id,rc.primary_field_id,rc.primary_topic_id
+               FROM v35_event_clusters e
+               JOIN v30_historical_records h ON h.record_id=e.canonical_record_id
+               LEFT JOIN v30_record_classifications rc ON rc.record_id=h.record_id
+               WHERE e.cluster_status='candidate'"""
+        )
+        events = candidates + legacy
+        for event in events:
+            event["classification"] = {
+                "primary_industry_id": event.pop("primary_industry_id", None),
+                "primary_field_id": event.pop("primary_field_id", None),
+                "primary_topic_id": event.pop("primary_topic_id", None),
+            }
+        return events
+
     def v30_candidate_window(self, days: int) -> dict[str, Any]:
-        overview = self.v30_overview()
         taxonomy = self.v30_taxonomy()
-        window = rolling_window((overview or {}).get("events", []), days)
+        window = rolling_window(self.historical_candidate_events(), days, cutoff="2026-11-25")
         events = window.pop("events")
         return {
             **window,

@@ -101,8 +101,8 @@ def test_public_api_and_home_show_real_empty_state():
     assert "区间披露金额事件" in home
     assert "各领域融资事件次数与占比" in home
     assert "/events?industry_id=" in home
-    assert "候选融资事件数" in home and "95 起" in home
-    assert "涉及企业数（候选）" in home and "95 家" in home
+    assert "候选融资事件数" in home and "117 起" in home
+    assert "涉及企业数（候选）" in home and "113 家" in home
     assert 'href="/companies/repeated"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
     assert "近6个月融资趋势" not in home
@@ -114,7 +114,7 @@ def test_public_api_and_home_show_real_empty_state():
     assert "谱星航天" in repeated.text and "已合并重复来源" in repeated.text
     assert "蓝固新能源" in repeated.text and "保留1个事件" in repeated.text
     assert 'data-period="30"' in home and 'data-period="90"' in home and 'data-period="360"' in home
-    assert "历史数据仅覆盖 2026-11-02 至 2026-11-25" in home
+    assert "数据完整覆盖所选窗口" in home
     assert "window=30" in home and "window=90" in home and "window=360" in home
     assert home.index("资本流向概览") < home.index("产业技术分类导航")
     formal = client.get("/events?scope=formal&industry_id=robot").text
@@ -134,6 +134,6 @@ def test_rolling_capital_api_separates_formal_and_candidate_data():
     payload = response.json()
     assert payload["window_days"] == 90
     assert payload["formal_release"]["event_count"] == 0
-    assert payload["candidate_observation"]["industries"]["total"] == 95
-    assert payload["date_range"]["coverage_complete"] is False
+    assert payload["candidate_observation"]["industries"]["total"] == 387
+    assert payload["date_range"]["coverage_complete"] is True
     assert client.get("/api/capital-flow?window=31").status_code == 422
