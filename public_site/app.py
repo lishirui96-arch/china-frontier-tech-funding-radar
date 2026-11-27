@@ -196,7 +196,7 @@ def capital_flow_window(data: dict, candidate_rounds: dict, candidate_industries
     cards = "".join((
         metric("已披露融资金额", "coins", amount_summary),
         metric("候选融资事件数", "layers-3", f'{candidate_industries["total"]} 起'),
-        metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家', "/companies/repeated"),
+        metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家', f"/companies/multiple-fundings?window={days}"),
         metric("覆盖产业领域数（候选）", "network", f'{candidate_industries["industry_count"]} 个'),
     ))
     ranking_rows = []
@@ -366,6 +366,25 @@ async def repeated_companies(request: Request):
         sections.append(f'''<section class="panel repeated-company"><div class="section-head"><div><span class="repeat-badge confirmed">已合并重复来源</span><h2><a href="/companies/{esc(group["company_id"])}">{esc(group["company_name"])}</a></h2><p>{esc(group["reason"])}</p></div><strong>保留1个事件</strong></div>{v30_classified_rows(group["records"],taxonomy)}</section>''')
     body = f'''<div class="page-shell subpage"><a class="back" href="/">← 返回首页</a><span class="kicker">SOURCE MERGE AUDIT</span><h1>重复来源合并记录</h1><p class="lede">原始97条来源记录完整保留；两组重复来源经用户确认后合并为95个候选融资事件。以下展示主记录与被合并来源，网站统计仅计一次。</p>{"".join(sections) or empty_state("暂无重复来源合并记录","当前没有已确认的重复来源合并决定。")}</div>'''
     return page("重复来源合并记录", body, "/companies")
+
+
+async def multiple_funding_companies(request: Request):
+    try: days = int(request.query_params.get("window", "90"))
+    except ValueError: days = 90
+    if days not in {30, 90, 360}: days = 90
+    rows = rolling_window(service.historical_candidate_events(), days, cutoff="2026-11-27")["events"]
+    grouped: dict[str, list[dict]] = {}
+    for event in rows:
+        grouped.setdefault(str(event.get("company_name_standard") or event.get("company_id")), []).append(event)
+    repeated = [(name, records) for name, records in grouped.items() if len(records) > 1]
+    repeated.sort(key=lambda item: (-len(item[1]), item[0]))
+    taxonomy = service.v30_taxonomy()
+    sections = "".join(
+        f'''<section class="panel repeated-company"><div class="section-head"><div><span class="repeat-badge confirmed">窗口内多次融资</span><h2>{esc(name)}</h2><p>近{days}天内共{len(records)}次不同融资事件，重复来源已在展示层合并。</p></div><strong>{len(records)}次融资</strong></div>{v30_classified_rows(sorted(records,key=lambda row:str(row.get("disclosure_date") or ""),reverse=True),taxonomy)}</section>'''
+        for name, records in repeated
+    )
+    body = f'''<div class="page-shell subpage"><a class="back" href="/?window={days}">← 返回近{days}天资本流向</a><span class="kicker">REPEAT FUNDING COMPANIES</span><h1>近{days}天多次融资企业</h1><p class="lede">共{len(repeated)}家企业在当前窗口内披露两次或以上不同融资；同一融资的多来源报道只计一次。</p>{sections or empty_state("暂无多次融资企业",f"近{days}天内没有企业披露两次或以上不同融资。")}</div>'''
+    return page(f"近{days}天多次融资企业", body, "/companies")
 async def company_detail(request: Request):
     company=service.v30_company(request.path_params["company_id"])
     if not company:
@@ -473,6 +492,6 @@ async def funding_records_api(request: Request):
     }, headers={"Cache-Control": "public, max-age=300"})
 
 
-routes=[Route("/",home),Route("/api/monthly-capital-flow",monthly_capital_flow_api),Route("/api/capital-flow",capital_window_api),Route("/api/funding-records",funding_records_api),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/repeated",repeated_companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
+routes=[Route("/",home),Route("/api/monthly-capital-flow",monthly_capital_flow_api),Route("/api/capital-flow",capital_window_api),Route("/api/funding-records",funding_records_api),Route("/favicon.ico",favicon),Route("/taxonomy",taxonomy),Route("/industries/{industry_id}",industry_detail),Route("/fields",fields),Route("/fields/{field_id}",field_detail),Route("/themes/{topic_id}",theme_detail),Route("/tracks",tracks),Route("/tracks/{topic_id}",track_detail),Route("/emerging",emerging),Route("/companies",companies),Route("/companies/repeated",repeated_companies),Route("/companies/multiple-fundings",multiple_funding_companies),Route("/companies/{company_id}",company_detail),Route("/investors",investors),Route("/investors/{investor_id}",investor_detail),Route("/events",events),Route("/events/{event_id}",event_detail),Route("/methodology",methodology),Route("/search",search)]
 app=Starlette(debug=False,routes=routes)
 app.mount("/static",StaticFiles(directory=STATIC),name="static")

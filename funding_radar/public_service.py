@@ -310,7 +310,48 @@ def repeated_candidate_companies(events: list[dict[str, Any]]) -> list[dict[str,
 
 
 def merge_duplicate_candidate_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Merge records from one company/date/source article into one display event."""
+    """Merge multi-round articles and cross-source reports of the same financing."""
+    def merge_records(records: list[dict[str, Any]]) -> dict[str, Any]:
+        records = sorted(records, key=lambda row: str(row.get("disclosure_date") or ""))
+        item = dict(records[0])
+        if len(records) == 1:
+            return item
+
+        def combined(field: str, ignored: set[str] | None = None) -> str:
+            ignored = ignored or set()
+            values = []
+            for record in records:
+                value = str(record.get(field) or "").strip()
+                if value and value not in ignored and value not in values:
+                    values.append(value)
+            return " / ".join(values)
+
+        item["round_original"] = combined("round_original") or "未披露"
+        item["amount_original"] = combined("amount_original") or "未披露"
+        item["investors_original"] = combined(
+            "investors_original", {"未披露", "未结构化提取", "待结构化", "[]"}
+        ) or "未披露"
+        event_ids = []
+        source_urls = []
+        record_count = 0
+        for record in records:
+            ids = record.get("merged_event_ids") or [record.get("unique_event_id") or record.get("record_id")]
+            event_ids.extend(str(value) for value in ids if value and str(value) not in event_ids)
+            url = str(record.get("source_url") or "").strip()
+            if url and url not in source_urls:
+                source_urls.append(url)
+            record_count += int(record.get("merged_record_count") or 1)
+            if not item.get("classification", {}).get("primary_industry_id") and record.get("classification", {}).get("primary_industry_id"):
+                item["classification"] = record["classification"]
+        item["merged_event_ids"] = event_ids
+        item["merged_source_urls"] = source_urls
+        item["merged_record_count"] = record_count
+        buckets = {candidate_round_bucket(record.get("round_original")) for record in records}
+        item["round_bucket"] = next(iter(buckets)) if len(buckets) == 1 else "other"
+        if any(record.get("review_status") == "needs_verification" for record in records):
+            item["review_status"] = "needs_verification"
+        return item
+
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for event in events:
         source_url = str(event.get("source_url") or "").strip()
@@ -321,34 +362,41 @@ def merge_duplicate_candidate_events(events: list[dict[str, Any]]) -> list[dict[
         )
         groups.setdefault(key, []).append(event)
 
-    merged = []
-    for records in groups.values():
-        item = dict(records[0])
-        if len(records) > 1:
-            def combined(field: str, ignored: set[str] | None = None) -> str:
-                ignored = ignored or set()
-                values = []
-                for record in records:
-                    value = str(record.get(field) or "").strip()
-                    if value and value not in ignored and value not in values:
-                        values.append(value)
-                return " / ".join(values)
+    merged = [merge_records(records) for records in groups.values()]
 
-            item["round_original"] = combined("round_original") or "未披露"
-            item["amount_original"] = combined("amount_original") or "未披露"
-            item["investors_original"] = combined(
-                "investors_original", {"未披露", "未结构化提取", "待结构化"}
-            ) or "未披露"
-            item["merged_event_ids"] = [
-                str(record.get("unique_event_id") or record.get("record_id")) for record in records
-            ]
-            item["merged_record_count"] = len(records)
-            buckets = {candidate_round_bucket(record.get("round_original")) for record in records}
-            item["round_bucket"] = next(iter(buckets)) if len(buckets) == 1 else "other"
-            if any(record.get("review_status") == "needs_verification" for record in records):
-                item["review_status"] = "needs_verification"
-        merged.append(item)
-    return merged
+    def normalized_round(value: object) -> str:
+        text = re.sub(r"[\s－—_-]+", "", str(value or "")).lower().replace("轮", "")
+        return "天使" if text == "angel" else text
+
+    def normalized_amount(value: object) -> str:
+        return re.sub(r"\s+", "", str(value or "")).replace("人民币", "元")
+
+    report_groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    passthrough = []
+    ignored_amounts = {"", "未披露", "元", "[]"}
+    for event in merged:
+        company = str(event.get("company_name_standard") or event.get("company_id") or "").strip()
+        round_key = normalized_round(event.get("round_original"))
+        amount_key = normalized_amount(event.get("amount_original"))
+        if not company or not round_key or amount_key in ignored_amounts or "/" in round_key:
+            passthrough.append(event)
+            continue
+        report_groups.setdefault((company, round_key, amount_key), []).append(event)
+
+    result = list(passthrough)
+    for records in report_groups.values():
+        clusters: list[list[dict[str, Any]]] = []
+        for record in sorted(records, key=lambda row: str(row.get("disclosure_date") or "")):
+            current_date = date.fromisoformat(str(record.get("disclosure_date") or record.get("announcement_date")))
+            target = next((cluster for cluster in clusters if
+                           abs((current_date - date.fromisoformat(str(cluster[-1].get("disclosure_date") or cluster[-1].get("announcement_date")))).days) <= 14 and
+                           str(record.get("source_url") or "") != str(cluster[-1].get("source_url") or "")), None)
+            if target is None:
+                clusters.append([record])
+            else:
+                target.append(record)
+        result.extend(merge_records(cluster) for cluster in clusters)
+    return result
 
 
 class PublicDataService:

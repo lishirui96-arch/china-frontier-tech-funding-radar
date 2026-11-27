@@ -103,13 +103,13 @@ def test_public_api_and_home_show_real_empty_state():
     assert "区间披露金额事件" in home
     assert "各领域融资事件次数与占比" in home
     assert "/events?industry_id=" in home
-    assert "候选融资事件数" in home and "117 起" in home
-    assert "涉及企业数（候选）" in home and "117 家" in home
+    assert "候选融资事件数" in home and "116 起" in home
+    assert "涉及企业数（候选）" in home and "116 家" in home
     assert "近30天融资记录" in home
-    assert "共117条，其中117条已归入一级分类" in home
+    assert "共116条，其中116条已归入一级分类" in home
     assert "英汉思动力" in home and "闪科光联" in home and "华源智因" in home
-    assert home.count("<tr><td>") >= 117
-    assert 'href="/companies/repeated"' in home
+    assert home.count("<tr><td>") >= 116
+    assert 'href="/companies/multiple-fundings?window=30"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
     assert "近6个月融资趋势" not in home
     assert "VC（Pre-A–B++） 产业领域分布" in home
@@ -119,6 +119,11 @@ def test_public_api_and_home_show_real_empty_state():
     assert repeated.status_code == 200
     assert "谱星航天" in repeated.text and "已合并重复来源" in repeated.text
     assert "蓝固新能源" in repeated.text and "保留1个事件" in repeated.text
+    multiple = client.get("/companies/multiple-fundings?window=90")
+    assert multiple.status_code == 200
+    assert "共1家企业" in multiple.text and "元示科技" in multiple.text
+    assert "超球面科技" not in multiple.text
+    assert multiple.text.count("<tr><td>") == 2
     assert 'data-period="30"' in home and 'data-period="90"' in home and 'data-period="360"' in home
     assert "数据完整覆盖所选窗口" in home
     assert "window=30" in home and "window=90" in home and "window=360" in home
@@ -140,7 +145,7 @@ def test_rolling_capital_api_separates_formal_and_candidate_data():
     payload = response.json()
     assert payload["window_days"] == 90
     assert payload["formal_release"]["event_count"] == 0
-    assert payload["candidate_observation"]["industries"]["total"] == 382
+    assert payload["candidate_observation"]["industries"]["total"] == 381
     assert payload["date_range"]["coverage_complete"] is True
     assert client.get("/api/capital-flow?window=31").status_code == 422
 
@@ -152,8 +157,8 @@ def test_90_day_period_link_updates_home_record_table_and_classification():
     assert 'class="capital-period active" data-period="90"' in home.text
     assert 'data-capital-window="90" >' in home.text
     assert "近90天融资记录" in home.text
-    assert "共382条，其中381条已归入一级分类" in home.text
-    assert home.text.count("<tr><td>") == 382
+    assert "共381条，其中380条已归入一级分类" in home.text
+    assert home.text.count("<tr><td>") == 381
     assert "安柏芮ANDPERIOD" in home.text
     assert 'onclick="selectCapitalPeriod(90,this)"' in home.text
     assert "fetch('/api/funding-records?window='+days)" in home.text
@@ -171,7 +176,7 @@ def test_90_day_period_link_updates_home_record_table_and_classification():
 
 def test_funding_records_api_returns_each_window_without_navigation():
     client = TestClient(app)
-    for days, total, classified in ((30, 117, 117), (90, 382, 381), (360, 1399, 1382)):
+    for days, total, classified in ((30, 116, 116), (90, 381, 380), (360, 1398, 1381)):
         response = client.get(f"/api/funding-records?window={days}")
         assert response.status_code == 200
         payload = response.json()
@@ -186,7 +191,7 @@ def test_30_day_increment_and_every_bar_drill_down_match():
     service = PublicDataService()
     events = rolling_window(service.historical_candidate_events(), 30, cutoff="2026-11-27")["events"]
     additions = [event for event in events if event["disclosure_date"] >= "2026-11-26"]
-    assert len(events) == 117 and len(additions) == 12
+    assert len(events) == 116 and len(additions) == 12
     assert {event["company_name_standard"] for event in additions} == {
         "英汉思动力", "博登智能", "零次方机器人", "粒影生物", "时空智子", "向量奇点",
         "环码生物", "迈塔兰斯", "华辰芯光", "华源智因", "HearWell", "闪科光联",
@@ -232,3 +237,14 @@ def test_same_company_date_and_source_are_merged_into_one_display_event():
     assert len(yinuo) == 1
     assert yinuo[0]["round_original"] == "天使轮 / Pre-A轮"
     assert yinuo[0]["merged_record_count"] == 2
+
+
+def test_cross_source_duplicate_report_is_merged_but_real_repeat_funding_is_preserved():
+    events = PublicDataService().historical_candidate_events()
+    hypersphere = [event for event in events if event["company_name_standard"] == "超球面科技"]
+    assert len(hypersphere) == 1
+    assert hypersphere[0]["merged_record_count"] == 2
+    assert len(hypersphere[0]["merged_source_urls"]) == 2
+    yuanshi = [event for event in events if event["company_name_standard"] == "元示科技"]
+    assert len(yuanshi) == 2
+    assert {event["round_original"] for event in yuanshi} == {"天使轮 / 天使+轮", "Pre-A轮"}
