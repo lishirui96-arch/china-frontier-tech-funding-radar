@@ -145,6 +145,28 @@ def test_rolling_capital_api_separates_formal_and_candidate_data():
     assert client.get("/api/capital-flow?window=31").status_code == 422
 
 
+def test_90_day_period_link_updates_home_record_table_and_classification():
+    client = TestClient(app)
+    home = client.get("/?window=90")
+    assert home.status_code == 200
+    assert 'class="capital-period active" data-period="90"' in home.text
+    assert 'data-capital-window="90" >' in home.text
+    assert "近90天融资记录" in home.text
+    assert "共382条，其中381条已归入一级分类" in home.text
+    assert home.text.count("<tr><td>") == 382
+    assert "安柏芮ANDPERIOD" in home.text
+    assert 'href="/?window=90#funding-records"' in home.text
+
+    events = rolling_window(PublicDataService().historical_candidate_events(), 90,
+                            cutoff="2026-11-27")["events"]
+    andperiod = next(event for event in events if event["company_name_standard"] == "安柏芮ANDPERIOD")
+    assert andperiod["classification"] == {
+        "primary_industry_id": "d97f43a8-6431-53ab-8a0f-7b249293c6ec",
+        "primary_field_id": "edc8b06e-95f5-5d50-bc86-eaa6c90b8398",
+        "primary_topic_id": "16e44396-6f2a-5182-8b1e-f5ea08500c80",
+    }
+
+
 def test_30_day_increment_and_every_bar_drill_down_match():
     service = PublicDataService()
     events = rolling_window(service.historical_candidate_events(), 30, cutoff="2026-11-27")["events"]
@@ -167,6 +189,23 @@ def test_30_day_increment_and_every_bar_drill_down_match():
         for industry in group["industries"]:
             response = client.get("/events?" + urlencode({
                 "industry_id": industry["industry_id"], "round_group": group["key"], "window": 30,
+            }))
+            assert response.status_code == 200
+            assert response.text.count("<tr><td>") == industry["event_count"]
+
+
+def test_90_day_every_bar_drill_down_matches():
+    service = PublicDataService()
+    client = TestClient(app)
+    window = service.v30_candidate_window(90)
+    for industry in window["industries"]["industries"]:
+        response = client.get("/events?" + urlencode({"industry_id": industry["industry_id"], "window": 90}))
+        assert response.status_code == 200
+        assert response.text.count("<tr><td>") == industry["event_count"]
+    for group in window["rounds"]["groups"]:
+        for industry in group["industries"]:
+            response = client.get("/events?" + urlencode({
+                "industry_id": industry["industry_id"], "round_group": group["key"], "window": 90,
             }))
             assert response.status_code == 200
             assert response.text.count("<tr><td>") == industry["event_count"]

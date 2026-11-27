@@ -188,7 +188,8 @@ def capital_amount(value: int | float, currency: str) -> str:
     return f"{value:,.0f} {currency}"
 
 
-def capital_flow_window(data: dict, candidate_rounds: dict, candidate_industries: dict, days: int) -> str:
+def capital_flow_window(data: dict, candidate_rounds: dict, candidate_industries: dict, days: int,
+                        selected_days: int) -> str:
     totals = data["totals"]
     amounts = totals["amounts"]
     amount_summary = " / ".join(capital_amount(value, code) for code, value in amounts.items()) or "暂无可统计金额"
@@ -222,20 +223,21 @@ def capital_flow_window(data: dict, candidate_rounds: dict, candidate_industries
     ring = f'<div class="candidate-donut" style="--donut:{donut_background}"><span><b>{candidate_rounds["total"]}起</b><small>候选融资数量</small></span></div><div class="candidate-round-table"><div class="candidate-round-head"><span>轮次</span><b>数量</b><em>占比</em></div><ul class="round-list">{"".join(round_rows)}</ul></div><p class="candidate-scope-note">A类{candidate_rounds["queue_counts"].get("A",0)}条 · B类{candidate_rounds["queue_counts"].get("B",0)}条候选观察样本<br>{esc(candidate_rounds["note"])}</p>'
     distribution = "".join(distribution_views)
     coverage = (f'数据完整覆盖所选窗口' if data["coverage_complete"] else f'历史数据仅覆盖 {data["effective_start_date"]} 至 {data["source_end_date"]}，不代表完整近{days}天市场')
-    return f'''<div class="capital-window" data-capital-window="{days}" {"" if days == 30 else "hidden"}><p class="capital-range">按公告日期统计 · 滚动{days}天 · 统计区间：{data["start_date"]} 至 {data["end_date"]} · {esc(coverage)}</p><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本周期暂无人工确认的正式融资事件；下方为A/B类候选观察样本" if totals["event_count"] == 0 else "正式事件与候选观察样本分开展示")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资事件次数与占比 <small>{candidate_industries["total"]}条候选观察样本（近{days}天）</small></h3><div class="ranking-list candidate-industry-ranking">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（正式Release辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-structure"><h3>资金结构（按轮次） <small>{candidate_rounds["total"]}条候选观察样本</small></h3>{ring}</article><article class="capital-panel round-industry-panel">{distribution}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></div>'''
+    return f'''<div class="capital-window" data-capital-window="{days}" {"" if days == selected_days else "hidden"}><p class="capital-range">按公告日期统计 · 滚动{days}天 · 统计区间：{data["start_date"]} 至 {data["end_date"]} · {esc(coverage)}</p><div class="capital-metrics">{cards}</div><p class="capital-empty-banner">{("本周期暂无人工确认的正式融资事件；下方为A/B类候选观察样本" if totals["event_count"] == 0 else "正式事件与候选观察样本分开展示")}</p><div class="capital-grid"><article class="capital-panel capital-ranking"><h3>各领域融资事件次数与占比 <small>{candidate_industries["total"]}条候选观察样本（近{days}天）</small></h3><div class="ranking-list candidate-industry-ranking">{"".join(ranking_rows)}</div></article><article class="capital-panel capital-disclosure"><h3>已披露融资金额 <small>（正式Release辅助指标）</small></h3>{disclosure}</article><article class="capital-panel capital-structure"><h3>资金结构（按轮次） <small>{candidate_rounds["total"]}条候选观察样本</small></h3>{ring}</article><article class="capital-panel round-industry-panel">{distribution}</article></div><p class="capital-method"><i data-lucide="shield-check"></i>未披露、累计融资及金额区间不计入金额合计；多主题关联按唯一事件ID去重。</p></div>'''
 
 
-def capital_flow_module(windows: dict[int, dict]) -> str:
-    panes = "".join(capital_flow_window(item["formal"], item["rounds"], item["industries"], days) for days, item in windows.items())
-    buttons = "".join(f'<button type="button" class="capital-period{(" active" if days == 30 else "")}" data-period="{days}" aria-pressed="{str(days == 30).lower()}" onclick="selectCapitalPeriod({days},this)">近{days}天</button>' for days in windows)
-    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">CAPITAL FLOW OVERVIEW</span><h2>资本流向概览</h2></div></div><div class="capital-periods" aria-label="统计周期">{buttons}</div></div>{panes}<script>function selectCapitalPeriod(days,button){{const root=document.getElementById('monthly-capital-flow');root.querySelectorAll('[data-capital-window]').forEach(view=>view.hidden=String(days)!==view.dataset.capitalWindow);root.querySelectorAll('[data-period]').forEach(item=>{{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',active)}});if(window.lucide)lucide.createIcons();}}function selectRoundIndustry(key,button){{const root=button.closest('[data-capital-window]');root.querySelectorAll('[data-round-view]').forEach(view=>view.hidden=view.dataset.roundView!==key);root.querySelectorAll('[data-round-key]').forEach(item=>{{const active=item===button;item.classList.toggle('selected',active);item.setAttribute('aria-selected',active)}});}}</script></section>'''
+def capital_flow_module(windows: dict[int, dict], selected_days: int) -> str:
+    panes = "".join(capital_flow_window(item["formal"], item["rounds"], item["industries"], days,
+                                        selected_days) for days, item in windows.items())
+    buttons = "".join(f'<a class="capital-period{(" active" if days == selected_days else "")}" data-period="{days}" aria-current="{str(days == selected_days).lower()}" href="/?window={days}#funding-records">近{days}天</a>' for days in windows)
+    return f'''<section class="capital-overview" id="monthly-capital-flow"><div class="capital-title"><div><span class="capital-icon"><i data-lucide="chart-no-axes-combined"></i></span><div><span class="kicker">CAPITAL FLOW OVERVIEW</span><h2>资本流向概览</h2></div></div><div class="capital-periods" aria-label="统计周期">{buttons}</div></div>{panes}<script>function selectRoundIndustry(key,button){{const root=button.closest('[data-capital-window]');root.querySelectorAll('[data-round-view]').forEach(view=>view.hidden=view.dataset.roundView!==key);root.querySelectorAll('[data-round-key]').forEach(item=>{{const active=item===button;item.classList.toggle('selected',active);item.setAttribute('aria-selected',active)}});}}</script></section>'''
 
 
-def v30_home(overview: dict) -> HTMLResponse:
+def v30_home(overview: dict, selected_days: int = 30) -> HTMLResponse:
     manifest = overview["manifest"]
     taxonomy = service.v30_taxonomy()
     events = rolling_window(
-        service.historical_candidate_events(), 30, cutoff="2026-11-27"
+        service.historical_candidate_events(), selected_days, cutoff="2026-11-27"
     )["events"]
     windows = {}
     for days in (30, 90, 360):
@@ -254,13 +256,17 @@ def v30_home(overview: dict) -> HTMLResponse:
         counts[key] = counts.get(key, 0) + 1
     industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
     version = taxonomy.get("version") or manifest.get("taxonomy_version", "V3.0")
-    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{len(taxonomy["industries"])}个产业方向、{len(taxonomy["fields"])}个技术领域和{len(taxonomy["topics"])}个技术主题组织融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级技术主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>近30天融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；同一企业、日期和来源的多轮记录合并展示。</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{len(taxonomy["industries"])}个产业方向、{len(taxonomy["fields"])}个技术领域和{len(taxonomy["topics"])}个技术主题组织融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows, selected_days)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级技术主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail" id="funding-records"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>近{selected_days}天融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；同一企业、日期和来源的多轮记录合并展示。</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
     return page("首页", body, "/")
 
 
 async def home(request: Request) -> HTMLResponse:
     v30 = service.v30_overview()
-    if v30: return v30_home(v30)
+    if v30:
+        try: selected_days = int(request.query_params.get("window", "30"))
+        except ValueError: selected_days = 30
+        if selected_days not in {30, 90, 360}: selected_days = 30
+        return v30_home(v30, selected_days)
     def page_number(value: str | None) -> int:
         try:
             return max(int(value or "1"), 1)
