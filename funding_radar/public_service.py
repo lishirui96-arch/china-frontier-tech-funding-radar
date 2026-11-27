@@ -266,6 +266,11 @@ def candidate_industry_structure(events: list[dict[str, Any]], industries: list[
         if industry_id:
             counts[industry_id] = counts.get(industry_id, 0) + 1
     total = len(unique)
+    company_events: dict[str, int] = {}
+    for event in unique.values():
+        company_id = str(event.get("company_id") or "")
+        if company_id:
+            company_events[company_id] = company_events.get(company_id, 0) + 1
     rows = [{"industry_id": row["industry_id"], "industry_name": row["name"],
              "event_count": counts.get(row["industry_id"], 0),
              "share": counts.get(row["industry_id"], 0) / total if total else 0}
@@ -274,7 +279,9 @@ def candidate_industry_structure(events: list[dict[str, Any]], industries: list[
     return {"scope": "A_B_candidate_observation", "total": total, "industries": rows,
             "classified": sum(row["event_count"] for row in rows),
             "unclassified": total - sum(row["event_count"] for row in rows),
-            "company_count": len({str(event.get("company_id")) for event in unique.values() if event.get("company_id")}),
+            "company_count": len(company_events),
+            "repeat_company_count": sum(count > 1 for count in company_events.values()),
+            "repeat_extra_event_count": sum(max(0, count - 1) for count in company_events.values()),
             "industry_count": sum(1 for row in rows if row["event_count"] > 0)}
 
 

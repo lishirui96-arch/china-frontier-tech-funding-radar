@@ -46,9 +46,10 @@ def page(title: str, body: str, active: str = "", query: str = "") -> HTMLRespon
     return HTMLResponse(f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="中国前沿科技融资热点研究平台"><link rel="icon" href="/favicon.ico"><title>{esc(title)} · 中国前沿科技融资热点雷达</title><link rel="stylesheet" href="/static/site.css"><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script></head><body>{nav(active,query)}<main>{body}</main><footer><div><b>中国前沿科技融资热点雷达</b><p>当前分类Release分别展示正式事件、A类候选与B类候选，候选状态不代表人工确认。</p></div><a href="/methodology">数据口径与证据规则</a></footer><script>if(window.lucide)lucide.createIcons();</script></body></html>''')
 
 
-def metric(label: str, icon: str, value: str | None, href: str = "") -> str:
+def metric(label: str, icon: str, value: str | None, href: str = "", detail: str = "") -> str:
     shown = esc(value) if value is not None else '<span class="pending">暂无已发布数据</span>'
-    content = f'<i data-lucide="{icon}"></i><div><span>{label}</span><strong>{shown}</strong></div>'
+    note = f'<small class="metric-detail">{esc(detail)}</small>' if detail else ""
+    content = f'<i data-lucide="{icon}"></i><div><span>{label}</span><strong>{shown}</strong>{note}</div>'
     return f'<a class="metric metric-link" href="{esc(href)}">{content}<i class="metric-arrow" data-lucide="arrow-up-right"></i></a>' if href else f'<article class="metric">{content}</article>'
 
 
@@ -196,7 +197,12 @@ def capital_flow_window(data: dict, candidate_rounds: dict, candidate_industries
     cards = "".join((
         metric("已披露融资金额", "coins", amount_summary),
         metric("候选融资事件数", "layers-3", f'{candidate_industries["total"]} 起'),
-        metric("涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家', f"/companies/multiple-fundings?window={days}"),
+        metric(
+            "涉及企业数（候选）", "building-2", f'{candidate_industries["company_count"]} 家',
+            f"/companies/multiple-fundings?window={days}",
+            (f'{candidate_industries["repeat_company_count"]} 家在期内多次融资'
+             if candidate_industries["repeat_company_count"] else "期内没有多次融资企业"),
+        ),
         metric("覆盖产业领域数（候选）", "network", f'{candidate_industries["industry_count"]} 个'),
     ))
     ranking_rows = []

@@ -124,6 +124,11 @@ def test_public_api_and_home_show_real_empty_state():
     assert "共1家企业" in multiple.text and "元示科技" in multiple.text
     assert "超球面科技" not in multiple.text
     assert multiple.text.count("<tr><td>") == 2
+    multiple_360 = client.get("/companies/multiple-fundings?window=360")
+    assert multiple_360.status_code == 200
+    assert "共117家企业" in multiple_360.text
+    assert multiple_360.text.count('窗口内多次融资') == 117
+    assert "117 家在期内多次融资" in client.get("/?window=360").text
     assert 'data-period="30"' in home and 'data-period="90"' in home and 'data-period="360"' in home
     assert "数据完整覆盖所选窗口" in home
     assert "window=30" in home and "window=90" in home and "window=360" in home
