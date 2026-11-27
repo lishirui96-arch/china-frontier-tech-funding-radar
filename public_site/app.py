@@ -232,7 +232,11 @@ def capital_flow_module(windows: dict[int, dict]) -> str:
 
 
 def v30_home(overview: dict) -> HTMLResponse:
-    manifest = overview["manifest"]; taxonomy = service.v30_taxonomy(); events = overview["events"]
+    manifest = overview["manifest"]
+    taxonomy = service.v30_taxonomy()
+    events = rolling_window(
+        service.historical_candidate_events(), 30, cutoff="2026-11-25"
+    )["events"]
     windows = {}
     for days in (30, 90, 360):
         candidate = service.v30_candidate_window(days)
@@ -250,7 +254,7 @@ def v30_home(overview: dict) -> HTMLResponse:
         counts[key] = counts.get(key, 0) + 1
     industry_cards = "".join(f'<a class="field-card" href="/industries/{item["industry_id"]}"><span class="field-en">INDUSTRY {esc(item["code"])}</span><h3>{esc(item["name"])}</h3><p>{sum(field["industry_id"]==item["industry_id"] for field in taxonomy["fields"])}个二级领域 · {sum(topic["field_id"] in {field["field_id"] for field in taxonomy["fields"] if field["industry_id"]==item["industry_id"]} for topic in taxonomy["topics"])}个三级主题</p><span class="field-count">{counts.get(item["industry_id"],0)}个已归类候选事件</span></a>' for item in taxonomy["industries"])
     version = taxonomy.get("version") or manifest.get("taxonomy_version", "V3.0")
-    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{len(taxonomy["industries"])}个产业方向、{len(taxonomy["fields"])}个技术领域和{len(taxonomy["topics"])}个技术主题组织融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级技术主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；企业下方展示主营业务画像</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
+    body = f'''<section class="hero taxonomy-hero"><div class="hero-content"><span class="eyebrow">FROZEN TAXONOMY · {esc(version)}</span><h1>中国前沿科技融资热点雷达</h1><p>以{len(taxonomy["industries"])}个产业方向、{len(taxonomy["fields"])}个技术领域和{len(taxonomy["topics"])}个技术主题组织融资样本。</p><dl><div><dt>分类版本</dt><dd>{esc(version)} · frozen</dd></div><div><dt>已归类/待分类</dt><dd>{manifest["classified"]} / {manifest["pending_classification"]}</dd></div><div><dt>更新时间</dt><dd>{esc(overview["release"]["created_at"][:10])}</dd></div></dl></div></section><div class="page-shell">{capital_flow_module(windows)}<section><div class="section-head"><div><span class="kicker">10 INDUSTRY DIRECTIONS</span><h2>产业技术分类导航</h2><p>逐级进入二级技术领域和三级技术主题</p></div><a href="/taxonomy">查看完整分类</a></div><div class="field-grid taxonomy-grid">{industry_cards}</div></section><section class="panel event-detail"><div class="section-head"><div><span class="kicker">FUNDING RECORDS</span><h2>近30天融资记录</h2><p>共{len(events)}条，其中{len(classified_events)}条已归入一级分类；包含原95条及10月27日至11月1日试采新增22条。</p></div></div>{v30_classified_rows(events, taxonomy)}</section></div>'''
     return page("首页", body, "/")
 
 

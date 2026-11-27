@@ -105,6 +105,10 @@ def test_public_api_and_home_show_real_empty_state():
     assert "/events?industry_id=" in home
     assert "候选融资事件数" in home and "117 起" in home
     assert "涉及企业数（候选）" in home and "113 家" in home
+    assert "近30天融资记录" in home
+    assert "共117条，其中117条已归入一级分类" in home
+    assert "恒元光电" in home and "乾原量子" in home and "术加医疗" in home
+    assert home.count("<tr><td>") >= 117
     assert 'href="/companies/repeated"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
     assert "近6个月融资趋势" not in home
