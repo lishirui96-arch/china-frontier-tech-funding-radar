@@ -462,6 +462,11 @@ async def events(request: Request):
     return listing("融资事件","VERIFIED EVENTS","文档数与唯一融资事件数严格分离。","暂无已发布融资事件","/events")
 async def event_detail(request: Request):
     event=service.event(request.path_params["event_id"])
+    if not event:
+        event=service.historical_event(request.path_params["event_id"])
+        if event:
+            body=f'<div class="page-shell subpage"><a class="back" href="/?window=360">← 返回近360天融资记录</a><span class="kicker">360-DAY CANDIDATE EVENT</span><h1>{esc(event.get("company_name_standard") or "融资事件")}</h1><p class="lede">360天候选融资事件 · 原始来源与分类信息</p><section class="panel event-detail">{v30_classified_rows([event],service.v30_taxonomy())}</section></div>'
+            return page(str(event.get("company_name_standard") or "融资事件详情"),body,"/events")
     return listing(event.get("company_name") if event else "融资事件详情","EVENT DETAIL","金额原文、轮次、投资方与主要证据来源。","该事件不在当前有效 Release 中","/events")
 
 
@@ -476,8 +481,8 @@ async def methodology(request: Request):
 async def search(request: Request):
     q=request.query_params.get("q","")
     results=service.search(q)
-    content="".join(f'<a class="result" href="{esc(r["url"])}"><span>{esc(r["type"])}</span><b>{esc(r["title"])}</b></a>' for r in results) if results else empty_state("没有公开搜索结果","搜索只覆盖当前有效 Release，不检索待审或候选数据。")
-    return page("搜索",f'<div class="page-shell subpage"><span class="kicker">SEARCH</span><h1>搜索：{esc(q)}</h1><section class="panel">{content}</section></div>',query=q)
+    content="".join(f'<a class="result" href="{esc(r["url"])}"><span>{esc(r["type"])}</span><b>{esc(r["title"])}</b></a>' for r in results) if results else empty_state("没有搜索结果","搜索覆盖近360天企业、技术、赛道和投资机构。")
+    return page("搜索",f'<div class="page-shell subpage"><span class="kicker">360-DAY SEARCH</span><h1>搜索：{esc(q)}</h1><p class="lede">覆盖近360天企业、技术描述、一级至三级赛道分类及融资机构。</p><section class="panel">{content}</section></div>',query=q)
 
 
 async def favicon(request: Request):

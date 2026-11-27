@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 from funding_radar.db import connect
@@ -900,18 +901,73 @@ class PublicDataService:
         }
 
     def search(self, query: str) -> list[dict[str, str]]:
-        release = self.current_release()
-        if not release or not query.strip():
+        query = query.strip()
+        if not query:
             return []
         needle = query.casefold()
-        results = []
-        for event in release.events:
-            track = primary_track(event)[1]
-            investors = " ".join(str(item.get("official_name") or "") for item in event.get("investors", []))
-            haystack = " ".join(str(event.get(k) or "") for k in ("company_name", "round_original", "use_of_funds_original")) + f" {track} {investors}"
-            if needle in haystack.casefold():
-                results.append({"type": "融资事件", "title": event.get("company_name") or "未命名企业", "url": f"/events/{event['event_id']}"})
+        results: list[dict[str, str]] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        def add(result_type: str, title: str, url: str) -> None:
+            key = (result_type, title, url)
+            if key not in seen:
+                seen.add(key)
+                results.append({"type": result_type, "title": title, "url": url})
+
+        taxonomy = self.v30_taxonomy()
+        industry_by_id = {row["industry_id"]: row for row in taxonomy["industries"]}
+        field_by_id = {row["field_id"]: row for row in taxonomy["fields"]}
+        topic_by_id = {row["topic_id"]: row for row in taxonomy["topics"]}
+        for row in taxonomy["industries"]:
+            if needle in f'{row.get("name", "")} {row.get("code", "")}'.casefold():
+                add("一级赛道", str(row["name"]), "/events?" + urlencode({"industry_id": row["industry_id"], "window": 360}))
+        for row in taxonomy["fields"]:
+            if needle in str(row.get("name") or "").casefold():
+                add("二级技术领域", str(row["name"]), f'/fields/{quote(str(row["field_id"]), safe="")}')
+        for row in taxonomy["topics"]:
+            topic_haystack = f'{row.get("name", "")} {row.get("technical_boundary", "")}'
+            if needle in topic_haystack.casefold():
+                add("三级技术主题", str(row["name"]), f'/themes/{quote(str(row["topic_id"]), safe="")}')
+
+        events = rolling_window(self.historical_candidate_events(), 360, cutoff="2026-11-27")["events"]
+        matched_companies: set[str] = set()
+        for event in events:
+            classification = event.get("classification") or {}
+            industry = industry_by_id.get(classification.get("primary_industry_id"), {})
+            field = field_by_id.get(classification.get("primary_field_id"), {})
+            topic = topic_by_id.get(classification.get("primary_topic_id"), {})
+            company_name = str(event.get("company_name_standard") or "未命名企业")
+            company_id = str(event.get("company_id") or company_name)
+            business = str(event.get("primary_business") or "")
+            technology = str(event.get("core_technology") or "")
+            investors = str(event.get("investors_original") or "")
+            company_match = needle in company_name.casefold()
+            technology_match = needle in f"{business} {technology}".casefold()
+            investor_match = needle in investors.casefold()
+            classification_match = needle in f'{industry.get("name", "")} {field.get("name", "")} {topic.get("name", "")}'.casefold()
+            event_match = needle in " ".join(str(event.get(key) or "") for key in (
+                "round_original", "amount_original", "source_platform"
+            )).casefold()
+            if not any((company_match, technology_match, investor_match, classification_match, event_match)):
+                continue
+            if (company_match or (technology_match and not investor_match)) and company_id not in matched_companies:
+                add("企业", company_name, f'/companies/{quote(company_id, safe="")}')
+                matched_companies.add(company_id)
+            investor_only = investor_match and not company_match and not classification_match and not event_match
+            result_type = "投资机构相关融资" if investor_only else "360天融资事件"
+            title = " · ".join(filter(None, (
+                company_name, str(event.get("disclosure_date") or ""), str(event.get("round_original") or "")
+            )))
+            event_id = quote(str(event.get("record_id") or event.get("unique_event_id") or ""), safe="")
+            add(result_type, title, f"/events/{event_id}")
         return results
+
+    def historical_event(self, event_id: str) -> dict[str, Any] | None:
+        return next(
+            (event for event in self.historical_candidate_events()
+             if str(event.get("record_id") or event.get("unique_event_id") or "") == event_id),
+            None,
+        )
 
     def event(self, event_id: str) -> dict[str, Any] | None:
         release = self.current_release()

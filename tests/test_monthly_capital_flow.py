@@ -274,6 +274,34 @@ def test_industry_cards_follow_selected_window_and_link_to_matching_events():
             assert response.text.count("<tr><td>") == industry["event_count"]
 
 
+def test_global_search_covers_360_day_companies_technology_tracks_and_investors():
+    client = TestClient(app)
+
+    company = client.get("/search?q=PhotonPay")
+    assert company.status_code == 200
+    assert "360-DAY SEARCH" in company.text
+    assert "PhotonPay光子易" in company.text
+    assert "企业" in company.text and "360天融资事件" in company.text
+    assert "/events/c2a7941e-febf-5302-a546-a74303ee2797" in company.text
+
+    technology = client.get("/search?q=跨境支付")
+    assert technology.status_code == 200
+    assert "PhotonPay光子易" in technology.text
+
+    track = client.get("/search?q=金融科技与数字支付")
+    assert track.status_code == 200
+    assert "一级赛道" in track.text
+    assert "industry_id=ff7843c2-7043-5859-bc3a-7d95cc558acf&amp;window=360" in track.text
+
+    investor = client.get("/search?q=IDG资本")
+    assert investor.status_code == 200
+    assert "投资机构相关融资" in investor.text and "PhotonPay光子易" in investor.text
+
+    detail = client.get("/events/c2a7941e-febf-5302-a546-a74303ee2797")
+    assert detail.status_code == 200
+    assert "360-DAY CANDIDATE EVENT" in detail.text and "PhotonPay光子易" in detail.text
+
+
 def test_same_company_date_and_source_are_merged_into_one_display_event():
     events = PublicDataService().historical_candidate_events()
     yinuo = [event for event in events if event["company_name_standard"] == "宜诺生物"]
