@@ -103,12 +103,12 @@ def test_public_api_and_home_show_real_empty_state():
     assert "区间披露金额事件" in home
     assert "各领域融资事件次数与占比" in home
     assert "/events?industry_id=" in home
-    assert "候选融资事件数" in home and "117 起" in home
+    assert "候选融资事件数" in home and "113 起" in home
     assert "涉及企业数（候选）" in home and "113 家" in home
     assert "近30天融资记录" in home
-    assert "共117条，其中117条已归入一级分类" in home
+    assert "共113条，其中113条已归入一级分类" in home
     assert "恒元光电" in home and "乾原量子" in home and "术加医疗" in home
-    assert home.count("<tr><td>") >= 117
+    assert home.count("<tr><td>") >= 113
     assert 'href="/companies/repeated"' in home
     assert "覆盖产业领域数（候选）" in home and "10 个" in home
     assert "近6个月融资趋势" not in home
@@ -140,7 +140,7 @@ def test_rolling_capital_api_separates_formal_and_candidate_data():
     payload = response.json()
     assert payload["window_days"] == 90
     assert payload["formal_release"]["event_count"] == 0
-    assert payload["candidate_observation"]["industries"]["total"] == 387
+    assert payload["candidate_observation"]["industries"]["total"] == 378
     assert payload["date_range"]["coverage_complete"] is True
     assert client.get("/api/capital-flow?window=31").status_code == 422
 
@@ -149,7 +149,7 @@ def test_30_day_additions_and_every_bar_drill_down_match():
     service = PublicDataService()
     events = rolling_window(service.historical_candidate_events(), 30, cutoff="2026-11-25")["events"]
     additions = [event for event in events if event["disclosure_date"] <= "2026-11-01"]
-    assert len(events) == 117 and len(additions) == 22
+    assert len(events) == 113 and len(additions) == 18
     assert {event["company_name_standard"] for event in additions} >= {
         "乾原量子", "恒元光电", "百世达", "脑虎科技", "宜诺生物", "天嗅智能", "术加医疗"
     }
@@ -167,3 +167,11 @@ def test_30_day_additions_and_every_bar_drill_down_match():
             }))
             assert response.status_code == 200
             assert response.text.count("<tr><td>") == industry["event_count"]
+
+
+def test_same_company_date_and_source_are_merged_into_one_display_event():
+    events = PublicDataService().historical_candidate_events()
+    yinuo = [event for event in events if event["company_name_standard"] == "宜诺生物"]
+    assert len(yinuo) == 1
+    assert yinuo[0]["round_original"] == "天使轮 / Pre-A轮"
+    assert yinuo[0]["merged_record_count"] == 2

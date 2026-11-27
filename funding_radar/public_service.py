@@ -309,6 +309,48 @@ def repeated_candidate_companies(events: list[dict[str, Any]]) -> list[dict[str,
     return sorted(results, key=lambda row: (row["finding"], row["company_name"]))
 
 
+def merge_duplicate_candidate_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge records from one company/date/source article into one display event."""
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for event in events:
+        source_url = str(event.get("source_url") or "").strip()
+        key = (
+            str(event.get("company_name_standard") or event.get("company_id") or "").strip(),
+            str(event.get("disclosure_date") or event.get("announcement_date") or "").strip(),
+            source_url or str(event.get("unique_event_id") or event.get("record_id") or ""),
+        )
+        groups.setdefault(key, []).append(event)
+
+    merged = []
+    for records in groups.values():
+        item = dict(records[0])
+        if len(records) > 1:
+            def combined(field: str, ignored: set[str] | None = None) -> str:
+                ignored = ignored or set()
+                values = []
+                for record in records:
+                    value = str(record.get(field) or "").strip()
+                    if value and value not in ignored and value not in values:
+                        values.append(value)
+                return " / ".join(values)
+
+            item["round_original"] = combined("round_original") or "未披露"
+            item["amount_original"] = combined("amount_original") or "未披露"
+            item["investors_original"] = combined(
+                "investors_original", {"未披露", "未结构化提取", "待结构化"}
+            ) or "未披露"
+            item["merged_event_ids"] = [
+                str(record.get("unique_event_id") or record.get("record_id")) for record in records
+            ]
+            item["merged_record_count"] = len(records)
+            buckets = {candidate_round_bucket(record.get("round_original")) for record in records}
+            item["round_bucket"] = next(iter(buckets)) if len(buckets) == 1 else "other"
+            if any(record.get("review_status") == "needs_verification" for record in records):
+                item["review_status"] = "needs_verification"
+        merged.append(item)
+    return merged
+
+
 class PublicDataService:
     """Read-only facade over immutable, currently published release snapshots."""
 
@@ -570,7 +612,7 @@ class PublicDataService:
                 "primary_field_id": event.pop("primary_field_id", None),
                 "primary_topic_id": event.pop("primary_topic_id", None),
             }
-        return events
+        return merge_duplicate_candidate_events(events)
 
     def historical_company(self, company_key: str) -> dict[str, Any] | None:
         events = [event for event in self.historical_candidate_events() if event.get("company_id") == company_key]
