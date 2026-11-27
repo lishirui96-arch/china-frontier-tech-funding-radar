@@ -1,0 +1,4 @@
+﻿level,v32_count,v37_recommended_additions,v37_observation_items,projected_count_if_approved,decision
+primary_industry,10,0,0,10,保持现有10个一级领域
+secondary_field,42,3,1,45,观察项不计入建议新增数
+tertiary_topic,51,6,1,57,观察项不计入建议新增数
