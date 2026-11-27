@@ -309,7 +309,9 @@ def repeated_candidate_companies(events: list[dict[str, Any]]) -> list[dict[str,
     return sorted(results, key=lambda row: (row["finding"], row["company_name"]))
 
 
-def merge_duplicate_candidate_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def merge_duplicate_candidate_events(
+    events: list[dict[str, Any]], confirmed_duplicate_groups: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
     """Merge multi-round articles and cross-source reports of the same financing."""
     def merge_records(records: list[dict[str, Any]]) -> dict[str, Any]:
         records = sorted(records, key=lambda row: str(row.get("disclosure_date") or ""))
@@ -352,14 +354,17 @@ def merge_duplicate_candidate_events(events: list[dict[str, Any]]) -> list[dict[
             item["review_status"] = "needs_verification"
         return item
 
+    confirmed_duplicate_groups = confirmed_duplicate_groups or {}
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for event in events:
         source_url = str(event.get("source_url") or "").strip()
-        key = (
+        event_id = str(event.get("unique_event_id") or event.get("record_id") or "")
+        confirmed_group = confirmed_duplicate_groups.get(event_id)
+        key = (("confirmed", confirmed_group, "") if confirmed_group else (
             str(event.get("company_name_standard") or event.get("company_id") or "").strip(),
             str(event.get("disclosure_date") or event.get("announcement_date") or "").strip(),
-            source_url or str(event.get("unique_event_id") or event.get("record_id") or ""),
-        )
+            source_url or event_id,
+        ))
         groups.setdefault(key, []).append(event)
 
     merged = [merge_records(records) for records in groups.values()]
@@ -621,7 +626,8 @@ class PublicDataService:
         )
         v37_join = (
             "LEFT JOIN v37_candidate_classifications v "
-            "ON v.candidate_id=c.candidate_id AND v.taxonomy_version='V3.7' "
+            "ON v.candidate_id=c.candidate_id AND v.taxonomy_version=("
+            "SELECT taxonomy_version FROM v37_taxonomy_settings WHERE setting_key='current_taxonomy') "
             "AND v.review_status='pending_approval'"
         ) if has_v37 else ""
         candidates = self._rows(
@@ -660,7 +666,20 @@ class PublicDataService:
                 "primary_field_id": event.pop("primary_field_id", None),
                 "primary_topic_id": event.pop("primary_topic_id", None),
             }
-        return merge_duplicate_candidate_events(events)
+        duplicate_groups: dict[str, str] = {}
+        if self._rows("SELECT name FROM sqlite_master WHERE type='table' AND name='v38_historical_duplicate_reports'"):
+            duplicate_rows = self._rows(
+                """SELECT c1.stable_event_id canonical_event_id,c2.stable_event_id duplicate_event_id,
+                          d.canonical_candidate_id group_id
+                   FROM v38_historical_duplicate_reports d
+                   JOIN v35_historical_candidates c1 ON c1.candidate_id=d.canonical_candidate_id
+                   JOIN v35_historical_candidates c2 ON c2.candidate_id=d.duplicate_candidate_id
+                   WHERE d.decision_status='confirmed'"""
+            )
+            for row in duplicate_rows:
+                duplicate_groups[row["canonical_event_id"]] = row["group_id"]
+                duplicate_groups[row["duplicate_event_id"]] = row["group_id"]
+        return merge_duplicate_candidate_events(events, duplicate_groups)
 
     def historical_company(self, company_key: str) -> dict[str, Any] | None:
         events = [event for event in self.historical_candidate_events() if event.get("company_id") == company_key]

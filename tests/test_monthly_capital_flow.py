@@ -95,7 +95,7 @@ def test_public_api_and_home_show_real_empty_state():
     assert payload["scope"] == "formal_confirmed_release_only"
     assert payload["totals"]["event_count"] == 0
     assert payload["totals"]["amounts"] == {}
-    assert len(payload["industries"]) == 10
+    assert len(payload["industries"]) == 11
     home = client.get("/").text
     assert "本周期暂无人工确认的正式融资事件" in home
     assert "资本流向：资金由市场流入各产业领域" not in home
@@ -157,7 +157,7 @@ def test_90_day_period_link_updates_home_record_table_and_classification():
     assert 'class="capital-period active" data-period="90"' in home.text
     assert 'data-capital-window="90" >' in home.text
     assert "近90天融资记录" in home.text
-    assert "共381条，其中380条已归入一级分类" in home.text
+    assert "共381条，其中381条已归入一级分类" in home.text
     assert home.text.count("<tr><td>") == 381
     assert "安柏芮ANDPERIOD" in home.text
     assert 'onclick="selectCapitalPeriod(90,this)"' in home.text
@@ -176,7 +176,7 @@ def test_90_day_period_link_updates_home_record_table_and_classification():
 
 def test_funding_records_api_returns_each_window_without_navigation():
     client = TestClient(app)
-    for days, total, classified in ((30, 116, 116), (90, 381, 380), (360, 1398, 1381)):
+    for days, total, classified in ((30, 116, 116), (90, 381, 381), (360, 1397, 1397)):
         response = client.get(f"/api/funding-records?window={days}")
         assert response.status_code == 200
         payload = response.json()
@@ -185,6 +185,23 @@ def test_funding_records_api_returns_each_window_without_navigation():
         assert payload["classified"] == classified
         assert payload["html"].count("<tr><td>") == total
     assert client.get("/api/funding-records?window=31").status_code == 422
+
+
+def test_360_day_audit_classifies_every_event_and_merges_confirmed_series():
+    service = PublicDataService()
+    assert service.v30_taxonomy()["version"] == "V3.8"
+    events = rolling_window(service.historical_candidate_events(), 360, cutoff="2026-11-27")["events"]
+    assert len(events) == 1397
+    assert all(event["classification"]["primary_industry_id"] for event in events)
+
+    junhe = [event for event in events if event["company_name_standard"] == "钧合原子"]
+    assert len(junhe) == 1
+    assert junhe[0]["merged_record_count"] == 2
+    assert len(junhe[0]["merged_source_urls"]) == 2
+    assert junhe[0]["classification"]["primary_topic_id"] == "3a6de858-d0ef-5a96-8c18-8640e655d4bf"
+
+    photonpay = next(event for event in events if event["company_name_standard"] == "PhotonPay光子易")
+    assert photonpay["classification"]["primary_industry_id"] == "ff7843c2-7043-5859-bc3a-7d95cc558acf"
 
 
 def test_30_day_increment_and_every_bar_drill_down_match():

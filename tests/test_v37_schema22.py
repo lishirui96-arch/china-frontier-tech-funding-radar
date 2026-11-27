@@ -8,7 +8,7 @@ from funding_radar.public_service import PublicDataService
 def test_schema22_preserves_v32_and_activates_v37(db):
     migrate(db)
     with connect(db, read_only=True) as connection:
-        assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 22
+        assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 23
         assert connection.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='v37_candidate_classifications'"
         ).fetchone()[0] == 1
