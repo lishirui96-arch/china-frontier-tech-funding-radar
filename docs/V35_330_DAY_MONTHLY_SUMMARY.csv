@@ -1,0 +1,12 @@
+﻿period_start,period_end,raw_source_count,new_candidate_count,vc_event_count,early_event_count,pending_round_count,duplicate_source_count,pending_classification_count,status
+2025-12-01,2025-12-31,148,117,64,25,28,0,117,completed
+2026-01-01,2026-01-31,153,120,66,21,33,2,120,completed
+2026-02-01,2026-02-28,94,75,43,13,19,1,77,completed
+2026-03-01,2026-03-31,154,116,51,36,29,0,116,completed
+2026-04-01,2026-04-30,137,101,54,19,28,2,102,completed
+2026-05-01,2026-05-31,167,123,50,34,39,0,123,completed
+2026-06-01,2026-06-30,164,125,61,28,36,2,126,completed
+2026-07-01,2026-07-31,184,145,63,42,40,0,145,completed
+2026-08-01,2026-08-31,167,139,68,32,39,1,139,completed
+2026-09-01,2026-09-30,203,152,74,42,36,2,153,completed
+2026-10-01,2026-10-26,111,98,47,29,22,0,98,completed
