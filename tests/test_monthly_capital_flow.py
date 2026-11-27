@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from starlette.testclient import TestClient
 
 from funding_radar.public_service import PublicDataService, PublicRelease, aggregate_monthly_capital_flow, rolling_window
@@ -137,3 +139,27 @@ def test_rolling_capital_api_separates_formal_and_candidate_data():
     assert payload["candidate_observation"]["industries"]["total"] == 387
     assert payload["date_range"]["coverage_complete"] is True
     assert client.get("/api/capital-flow?window=31").status_code == 422
+
+
+def test_30_day_additions_and_every_bar_drill_down_match():
+    service = PublicDataService()
+    events = rolling_window(service.historical_candidate_events(), 30, cutoff="2026-11-25")["events"]
+    additions = [event for event in events if event["disclosure_date"] <= "2026-11-01"]
+    assert len(events) == 117 and len(additions) == 22
+    assert {event["company_name_standard"] for event in additions} >= {
+        "乾原量子", "恒元光电", "百世达", "脑虎科技", "宜诺生物", "天嗅智能", "术加医疗"
+    }
+
+    client = TestClient(app)
+    window = service.v30_candidate_window(30)
+    for industry in window["industries"]["industries"]:
+        response = client.get("/events?" + urlencode({"industry_id": industry["industry_id"], "window": 30}))
+        assert response.status_code == 200
+        assert response.text.count("<tr><td>") == industry["event_count"]
+    for group in window["rounds"]["groups"]:
+        for industry in group["industries"]:
+            response = client.get("/events?" + urlencode({
+                "industry_id": industry["industry_id"], "round_group": group["key"], "window": 30,
+            }))
+            assert response.status_code == 200
+            assert response.text.count("<tr><td>") == industry["event_count"]

@@ -358,8 +358,10 @@ async def repeated_companies(request: Request):
     return page("重复来源合并记录", body, "/companies")
 async def company_detail(request: Request):
     company=service.v30_company(request.path_params["company_id"])
+    if not company:
+        company=service.historical_company(request.path_params["company_id"])
     if company:
-        body=f'<div class="page-shell subpage"><a class="back" href="/companies">← 返回企业库</a><span class="kicker">COMPANY DETAIL</span><h1>{esc(company["name"])}</h1><p class="lede">{esc(company["business"])}</p><section class="theme-metrics"><div><span>核心产品</span><b>{esc(company["products"])}</b></div><div><span>核心技术</span><b>{esc(company["technologies"])}</b></div><div><span>融资记录</span><b>{len(company["events"])}笔</b></div></section><section class="panel event-detail">{v30_event_rows(company["events"])}</section></div>'
+        body=f'<div class="page-shell subpage"><a class="back" href="/companies">← 返回企业库</a><span class="kicker">COMPANY DETAIL</span><h1>{esc(company["name"])}</h1><p class="lede">{esc(company["business"])}</p><section class="theme-metrics"><div><span>核心产品</span><b>{esc(company["products"])}</b></div><div><span>核心技术</span><b>{esc(company["technologies"])}</b></div><div><span>融资记录</span><b>{len(company["events"])}笔</b></div></section><section class="panel event-detail">{v30_classified_rows(company["events"],service.v30_taxonomy())}</section></div>'
         return page(company["name"],body,"/companies")
     company=service.company(request.path_params["company_id"]); return listing(company["name"] if company else "企业详情","COMPANY DETAIL","企业产品、技术方向和融资时间线。","暂无可公开企业数据","/companies")
 async def investors(request: Request): return listing("投资机构","INVESTOR DIRECTORY","仅统计有效 Release 中去重后的投资机构。","暂无已发布投资机构","/investors")
@@ -381,7 +383,8 @@ async def events(request: Request):
         try: window_days=int(request.query_params.get("window", "0"))
         except ValueError: window_days=0
         if window_days not in {30,90,360}: window_days=0
-        window_events=rolling_window(overview["events"], window_days)["events"] if window_days else overview["events"]
+        all_events=service.historical_candidate_events()
+        window_events=rolling_window(all_events, window_days, cutoff="2026-11-25")["events"] if window_days else all_events
         rows=[event for event in window_events if (not industry_id or event["classification"].get("primary_industry_id")==industry_id) and (not round_group or candidate_round_bucket(event.get("round_original"))==round_group)]
         classified=sum(event["classification"].get("primary_industry_id") is not None for event in rows)
         industry=next((x for x in taxonomy["industries"] if x["industry_id"]==industry_id),None)

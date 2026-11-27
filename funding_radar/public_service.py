@@ -536,17 +536,27 @@ class PublicDataService:
         ) if has_v37 else ""
         candidates = self._rows(
             f"""SELECT c.stable_event_id unique_event_id,c.stable_event_id record_id,
-                      c.company_name company_id,c.company_name company_name_standard,c.announcement_date,c.round_original,
-                      c.round_bucket,c.review_status,c.primary_business,c.core_technology,
+                      c.company_name company_id,c.company_name company_name_standard,
+                      c.announcement_date,c.announcement_date disclosure_date,c.round_original,
+                      c.amount_original,c.investors_original,c.round_bucket,c.review_status,
+                      c.primary_business,c.core_technology,
+                      s.source_name source_platform,s.source_url,
                       {v37_columns}
                FROM v35_historical_candidates c
                LEFT JOIN v35_classification_proposals p ON p.candidate_id=c.candidate_id
+               LEFT JOIN v35_candidate_sources s ON s.candidate_id=c.candidate_id
+                 AND s.candidate_source_id=(
+                   SELECT MIN(s2.candidate_source_id) FROM v35_candidate_sources s2
+                   WHERE s2.candidate_id=c.candidate_id
+                 )
                {v37_join}
                WHERE c.review_status IN ('pending','needs_verification')"""
         )
         legacy = self._rows(
             """SELECT e.cluster_id unique_event_id,e.cluster_id record_id,
-                      h.company_name_standard company_id,h.company_name_standard,h.disclosure_date announcement_date,h.round_original,
+                      h.company_name_standard company_id,h.company_name_standard,
+                      h.disclosure_date announcement_date,h.disclosure_date,h.round_original,
+                      h.amount_original,h.investors_original,h.source_platform,h.source_url,
                       h.queue_class,rc.primary_industry_id,rc.primary_field_id,rc.primary_topic_id
                FROM v35_event_clusters e
                JOIN v30_historical_records h ON h.record_id=e.canonical_record_id
@@ -561,6 +571,20 @@ class PublicDataService:
                 "primary_topic_id": event.pop("primary_topic_id", None),
             }
         return events
+
+    def historical_company(self, company_key: str) -> dict[str, Any] | None:
+        events = [event for event in self.historical_candidate_events() if event.get("company_id") == company_key]
+        if not events:
+            return None
+        first = events[0]
+        return {
+            "company_id": company_key,
+            "name": first.get("company_name_standard") or company_key,
+            "business": first.get("primary_business") or "主营业务待补充",
+            "products": "候选层暂未结构化",
+            "technologies": first.get("core_technology") or "核心技术待补充",
+            "events": events,
+        }
 
     def v30_candidate_window(self, days: int) -> dict[str, Any]:
         taxonomy = self.v30_taxonomy()
